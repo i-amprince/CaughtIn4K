@@ -104,4 +104,3 @@ The use case diagram clearly illustrates:
 - The human-in-the-loop validation mechanism.
 - The continual learning process through feedback integration.
 
-This diagram defines the functional scope of the Automated Quality Inspection System and highlights its adaptive and intelligent behavior.
