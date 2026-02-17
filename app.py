@@ -2,7 +2,7 @@ from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 
-# --- CONFIGURATION ---
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret-key-for-dev' 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
@@ -13,7 +13,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# --- DATABASE MODEL ---
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
@@ -24,7 +24,7 @@ class User(UserMixin, db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- ROUTES ---
+
 
 @app.route('/')
 def home():
@@ -50,7 +50,7 @@ def login():
 @login_required
 def dashboard():
     all_users = []
-    # If the logged-in user is an Admin, fetch all users to show them
+    
     if current_user.role == 'System Administrator':
         all_users = User.query.all()
     
@@ -85,7 +85,7 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# --- INITIAL SETUP ---
+
 def create_initial_users():
     """Creates default users if they don't exist"""
     with app.app_context():
