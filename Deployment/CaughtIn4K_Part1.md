@@ -9,7 +9,7 @@
 | ML Inference Engine (`image_preprocessing.py`, anomaly model) | **AWS EC2** (same instance) | Runs as part of the Flask process; can be offloaded to AWS Lambda if model is lightweight |
 | Database | **AWS RDS** (PostgreSQL, free tier) | Separate managed DB instance in the same AWS region |
 | Uploaded Images & Model Weights | **AWS S3** | Persistent object storage — two buckets: `caughtin4k-uploads` and `caughtin4k-models` |
-| Static Assets (CSS, JS, Heatmap outputs) | **AWS S3 + CloudFront CDN** | Fast global delivery of static content |
+| Static Assets (CSS, JS, Heatmap outputs) | **AWS S3** | Fast global delivery of static content |
 
 ---
 
