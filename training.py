@@ -1,12 +1,40 @@
 import os
+import re
+from pathlib import Path
 from anomalib.data import MVTec
 from anomalib.models import Patchcore
 from anomalib.engine import Engine
+from anomalib.engine import engine as anomalib_engine
 from anomalib.deploy import ExportType  # <--- FIXED: Changed from ExportMode to ExportType
+
+
+def _patch_anomalib_versioned_dir_for_windows() -> None:
+    """Avoid Windows symlink creation for anomalib's latest directory."""
+    if os.name != "nt":
+        return
+
+    def create_versioned_dir_without_symlink(root_dir: str | Path) -> Path:
+        version_pattern = re.compile(r"^v(\d+)$")
+        root_dir = Path(root_dir).resolve()
+        root_dir.mkdir(parents=True, exist_ok=True)
+
+        highest_version = -1
+        for version_dir in root_dir.iterdir():
+            if version_dir.is_dir():
+                match = version_pattern.match(version_dir.name)
+                if match:
+                    highest_version = max(highest_version, int(match.group(1)))
+
+        new_version_dir = root_dir / f"v{highest_version + 1}"
+        new_version_dir.mkdir(exist_ok=False)
+        return new_version_dir
+
+    anomalib_engine.create_versioned_dir = create_versioned_dir_without_symlink
 
 def train_local_item_model(mvtec_dataset_path: str, item_name: str, base_output_dir: str) -> str:
     print(f"Initializing Quality Inspection Training Pipeline for Item: '{item_name}'...")
     print(f"Using local MVTec dataset located at: {os.path.abspath(mvtec_dataset_path)}")
+    _patch_anomalib_versioned_dir_for_windows()
 
     # Set up data module
     datamodule = MVTec(
