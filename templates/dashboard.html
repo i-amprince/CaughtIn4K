@@ -3,345 +3,7 @@
 <head>
     <title>Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --dark-bg: #0a0a0a;
-            --darker: #050505;
-            --card-bg: #1a1a1a;
-            --border: rgba(255, 255, 255, 0.08);
-            --text: #ffffff;
-            --text-muted: #888888;
-            --orange: #ff6b35;
-            --orange-glow: rgba(255, 107, 53, 0.3);
-            --red: #ff3838;
-            --yellow: #ffa500;
-            --success: #10b981;
-            --success-bg: rgba(16, 185, 129, 0.1);
-            --error: #ef4444;
-            --error-bg: rgba(239, 68, 68, 0.1);
-            --admin-badge: #ffa726;
-            --engineer-badge: #42a5f5;
-            --operator-badge: #66bb6a;
-            --accent: #3b82f6; 
-        }
-
-        body {
-            font-family: 'Outfit', sans-serif;
-            margin: 0;
-            background: linear-gradient(180deg, var(--darker) 0%, var(--dark-bg) 100%);
-            color: var(--text);
-            min-height: 100vh;
-            position: relative;
-            overflow-x: hidden;
-        }
-
-        #flame-canvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        body::before {
-            content: '';
-            position: fixed;
-            width: 800px;
-            height: 800px;
-            background: radial-gradient(circle, var(--orange-glow) 0%, transparent 70%);
-            border-radius: 50%;
-            top: -400px;
-            right: -300px;
-            animation: flameGlow 8s ease-in-out infinite;
-            z-index: 0;
-        }
-
-        @keyframes flameGlow {
-            0%, 100% { 
-                opacity: 0.3;
-                transform: translate(0, 0) scale(1);
-            }
-            50% { 
-                opacity: 0.5;
-                transform: translate(20px, 20px) scale(1.1);
-            }
-        }
-
-        header {
-            background: rgba(26, 26, 26, 0.8);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            padding: 20px 40px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            animation: slideDown 0.5s ease-out;
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .logo-section {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .logo {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, var(--orange) 0%, var(--red) 100%);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 700;
-            font-size: 18px;
-            box-shadow: 0 4px 15px var(--orange-glow);
-        }
-
-        .system-title {
-            font-size: 1.3em;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
-
-        .user-section {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .user-info {
-            text-align: right;
-        }
-
-        .username {
-            font-weight: 600;
-            font-size: 0.95em;
-        }
-
-        .user-role {
-            font-size: 0.8em;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        .logout-btn {
-            color: var(--orange);
-            text-decoration: none;
-            font-weight: 600;
-            padding: 8px 16px;
-            border: 1px solid var(--orange);
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            font-size: 0.9em;
-        }
-
-        .logout-btn:hover {
-            background: var(--orange);
-            color: white;
-            box-shadow: 0 4px 15px var(--orange-glow);
-        }
-
-        .container {
-            padding: 40px;
-            max-width: 1400px;
-            margin: auto;
-            position: relative;
-            z-index: 10;
-        }
-
-        .card {
-            background: rgba(26, 26, 26, 0.6);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
-            padding: 30px;
-            border-radius: 16px;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            transition: all 0.3s ease;
-            animation: fadeInUp 0.6s ease-out backwards;
-        }
-
-        .card:nth-child(1) { animation-delay: 0.1s; }
-        .card:nth-child(2) { animation-delay: 0.2s; }
-        .card:nth-child(3) { animation-delay: 0.3s; }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .card:hover {
-            border-color: rgba(255, 255, 255, 0.15);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-        }
-
-        h3 {
-            margin: 0 0 20px 0;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--border);
-            font-size: 1.4em;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .msg {
-            padding: 16px 20px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            animation: slideIn 0.4s ease-out;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .msg.success { background: var(--success-bg); border: 1px solid rgba(16, 185, 129, 0.3); color: var(--success); }
-        .msg.success::before { content: '✓'; font-size: 20px; }
-        .msg.error { background: var(--error-bg); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--error); }
-        .msg.error::before { content: '⚠'; font-size: 20px; }
-
-        .form-inline {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1.2fr auto;
-            gap: 15px;
-            align-items: end;
-        }
-
-        input, select {
-            padding: 12px 16px;
-            background: rgba(10, 10, 10, 0.8);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--text);
-            font-size: 0.95em;
-            font-family: 'Outfit', sans-serif;
-            transition: all 0.3s ease;
-            outline: none;
-        }
-
-        input::placeholder { color: var(--text-muted); }
-
-        input:focus, select:focus {
-            border-color: var(--orange);
-            background: rgba(10, 10, 10, 0.95);
-            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
-        }
-
-        input:hover:not(:focus), select:hover:not(:focus) { border-color: rgba(255, 255, 255, 0.15); }
-        select { cursor: pointer; }
-
-        button.add-btn {
-            background: linear-gradient(135deg, var(--orange) 0%, var(--red) 100%);
-            color: white; border: none; padding: 12px 24px; border-radius: 10px; cursor: pointer;
-            font-weight: 600; font-size: 0.95em; font-family: 'Outfit', sans-serif;
-            transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
-        }
-
-        button.add-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5); }
-        button.add-btn:active { transform: translateY(0); }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        thead { background: rgba(255, 107, 53, 0.05); }
-        th {
-            padding: 14px 16px; text-align: left; font-weight: 600; font-size: 0.85em;
-            text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);
-            border-bottom: 1px solid var(--border);
-        }
-        td { padding: 16px; border-bottom: 1px solid var(--border); font-size: 0.95em; }
-        tbody tr { transition: all 0.2s ease; }
-        tbody tr:hover { background: rgba(255, 107, 53, 0.03); }
-        tbody tr:last-child td { border-bottom: none; }
-
-        .badge {
-            padding: 6px 14px; border-radius: 20px; font-size: 0.8em; font-weight: 600;
-            display: inline-block; letter-spacing: 0.3px;
-        }
-        .badge-admin { background: rgba(255, 167, 38, 0.15); color: var(--admin-badge); border: 1px solid rgba(255, 167, 38, 0.3); }
-        .badge-op { background: rgba(102, 187, 106, 0.15); color: var(--operator-badge); border: 1px solid rgba(102, 187, 106, 0.3); }
-        .badge-eng { background: rgba(66, 165, 245, 0.15); color: var(--engineer-badge); border: 1px solid rgba(66, 165, 245, 0.3); }
-
-        .start-btn {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: white; border: none; padding: 12px 24px; border-radius: 10px; cursor: pointer;
-            font-weight: 600; font-size: 0.95em; font-family: 'Outfit', sans-serif;
-            transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-        }
-        .start-btn:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5); }
-
-        .inspection-form { display: flex; gap: 15px; margin-bottom: 20px; }
-        .inspection-form input { flex-grow: 1; }
-        .heatmap-img {
-            border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); max-width: 120px;
-            height: auto; transition: transform 0.3s ease;
-        }
-        .heatmap-img:hover { transform: scale(2.5); z-index: 100; position: relative; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 25px; }
-        .stat-box {
-            background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border);
-            padding: 15px; border-radius: 12px; text-align: center;
-        }
-        .stat-value { font-size: 1.5em; font-weight: 700; color: var(--orange); margin-bottom: 5px; }
-        .stat-label { font-size: 0.8em; color: var(--text-muted); text-transform: uppercase; }
-        #loading-overlay { display: none; text-align: center; padding: 30px; color: var(--accent); font-weight: bold; }
-        #training-loading-overlay { display: none; text-align: center; padding: 30px; color: var(--engineer-badge); font-weight: bold; }
-
-        @media (max-width: 1024px) {
-            .form-inline { grid-template-columns: 1fr; }
-            .container { padding: 20px; }
-            header { padding: 15px 20px; flex-direction: column; gap: 15px; }
-            .user-section { width: 100%; justify-content: space-between; }
-        }
-
-        @media (max-width: 768px) {
-            .card { padding: 20px; }
-            h3 { font-size: 1.2em; }
-            table { font-size: 0.9em; }
-            th, td { padding: 10px; }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
 <body>
     <canvas id="flame-canvas"></canvas>
@@ -355,7 +17,7 @@
                 <div class="username">{{ user.username }}</div>
                 <div class="user-role">{{ user.role }}</div>
             </div>
-            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            <a href="{{ url_for('auth.logout') }}" class="logout-btn">Logout</a>
         </div>
     </header>
 
@@ -368,11 +30,10 @@
             {% endif %}
         {% endwith %}
 
-        <!-- SYSTEM ADMINISTRATOR PANEL -->
         {% if user.role == 'System Administrator' %}
         <div class="card">
-            <h3>➕ Add New User</h3>
-            <form action="{{ url_for('create_user') }}" method="POST" class="form-inline">
+            <h3>Add New User</h3>
+            <form action="{{ url_for('admin.create_user') }}" method="POST" class="form-inline">
                 <input type="text" name="username" placeholder="Username" required>
                 <input type="password" name="password" placeholder="Password" required>
                 <select name="role" required>
@@ -385,7 +46,7 @@
             </form>
         </div>
         <div class="card">
-            <h3>👥 User Management</h3>
+            <h3>User Management</h3>
             <table>
                 <thead>
                     <tr>
@@ -415,47 +76,43 @@
         </div>
         {% endif %}
 
-        <!-- MANUFACTURING ENGINEER PANEL -->
         {% if user.role == 'Manufacturing Engineer' %}
         <div class="card">
-            <h3>🤖 Train New Anomaly Detection Model</h3>
+            <h3>Train New Anomaly Detection Model</h3>
             <p style="color: var(--text-muted); margin-bottom: 20px;">
                 Provide the root path to the MVTec dataset and the name of the item sub-folder to begin training.
             </p>
-            
-            <form action="{{ url_for('start_training') }}" method="POST" class="form-inline" onsubmit="document.getElementById('training-loading-overlay').style.display='block';">
+
+            <form action="{{ url_for('ml.start_training') }}" method="POST" class="form-inline" onsubmit="document.getElementById('training-loading-overlay').style.display='block';">
                 <input type="text" name="dataset_path" placeholder="MVTec Dataset Root Path (e.g., C:/.../mvtec_anomaly_detection)" required style="grid-column: 1 / 3;">
                 <input type="text" name="item_name" placeholder="Item Name (e.g., bottle)" required>
                 <button type="submit" class="add-btn" style="background: var(--engineer-badge);">Start Training</button>
             </form>
 
             <div id="training-loading-overlay">
-                ⚙️ Training in progress... This will take a significant amount of time and the page will be unresponsive. Please do not close this tab.
+                Training in progress... This will take a significant amount of time and the page will be unresponsive. Please do not close this tab.
             </div>
         </div>
         {% endif %}
 
-        <!-- QUALITY OPERATOR PANEL -->
         {% if user.role == 'Quality Operator' %}
         <div class="card">
-            <h3>👁️ Run Batch Inspection</h3>
+            <h3>Run Batch Inspection</h3>
             <p style="color: var(--text-muted); margin-bottom: 20px;">Enter the absolute path to your test dataset folder.</p>
-            <form action="{{ url_for('run_inspection') }}" method="POST" ...>
-            <input type="text" name="item_name" placeholder="Item Name (e.g., bottle)" required>
-            <input type="text" name="test_folder" placeholder="Path to test images" required>
-            <button type="submit" class="start-btn">Run AI Model</button>
+            <form action="{{ url_for('ml.run_inspection') }}" method="POST">
+                <input type="text" name="item_name" placeholder="Item Name (e.g., bottle)" required>
+                <input type="text" name="test_folder" placeholder="Path to test images" required>
+                <button type="submit" class="start-btn">Run AI Model</button>
             </form>
-            
 
             <div id="loading-overlay">
-                ⚙️ Running PyTorch Inference... Please wait. This may take a moment.
+                Running PyTorch Inference... Please wait. This may take a moment.
             </div>
         </div>
 
-        <!-- INSPECTION RESULTS (This section will appear only after the model runs) -->
         {% if results %}
         <div class="card">
-            <h3>📊 Inference Summary</h3>
+            <h3>Inference Summary</h3>
             <div class="stats-grid">
                 <div class="stat-box">
                     <div class="stat-value">{{ summary.total }}</div>
@@ -508,61 +165,8 @@
         </div>
         {% endif %}
         {% endif %}
-
     </div>
 
-    <script>
-        const canvas = document.getElementById('flame-canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            initParticles();
-        });
-        class FlameParticle {
-            constructor() { this.reset(); this.y = Math.random() * canvas.height; }
-            reset() {
-                this.x = Math.random() * canvas.width;
-                this.y = canvas.height + 10;
-                this.radius = Math.random() * 3 + 1;
-                this.speed = Math.random() * 2 + 0.8;
-                this.drift = Math.random() * 1.5 - 0.75;
-                this.opacity = Math.random() * 0.6 + 0.2;
-                const colorType = Math.random();
-                if (colorType < 0.4) { this.color = `255, 107, 53`; } 
-                else if (colorType < 0.7) { this.color = `255, 56, 56`; } 
-                else { this.color = `150, 150, 150`; }
-            }
-            update() {
-                this.y -= this.speed; this.x += this.drift; this.opacity -= 0.002;
-                if (this.y < -10 || this.opacity <= 0) { this.reset(); }
-                if (this.x > canvas.width || this.x < 0) { this.x = Math.random() * canvas.width; }
-            }
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 2);
-                gradient.addColorStop(0, `rgba(${this.color}, ${this.opacity})`);
-                gradient.addColorStop(1, `rgba(${this.color}, 0)`);
-                ctx.fillStyle = gradient;
-                ctx.fill();
-            }
-        }
-        const particles = [];
-        const particleCount = 80;
-        function initParticles() {
-            particles.length = 0;
-            for (let i = 0; i < particleCount; i++) { particles.push(new FlameParticle()); }
-        }
-        function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            particles.forEach(particle => { particle.update(); particle.draw(); });
-            requestAnimationFrame(animate);
-        }
-        initParticles();
-        animate();
-    </script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>

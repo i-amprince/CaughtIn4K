@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+
+inspection_model_outputs/
+static/results/
+
+instance/*.db
+instance/*.sqlite
+instance/*.sqlite3
