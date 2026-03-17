@@ -110,6 +110,40 @@
             </div>
         </div>
 
+        {% if history_runs %}
+        <div class="card">
+            <div class="section-header">
+                <div>
+                    <h3>Recent Inspection History</h3>
+                    <p class="section-copy">Each card is one saved run. Open a card to see the full image-by-image history.</p>
+                </div>
+            </div>
+
+            <div class="history-grid">
+                {% for run in history_runs %}
+                <a href="{{ url_for('dashboard.history_detail', run_id=run.id) }}" class="history-card-link">
+                    <article class="history-card">
+                        <div class="history-card-top">
+                            <div>
+                                <div class="history-title">{{ run.item_name|title }}</div>
+                                <div class="history-time">Run #{{ run.id }} - {{ run.created_at.strftime('%d %b %Y, %I:%M %p') }}</div>
+                            </div>
+                            <span class="history-pill">{{ run.total_images }} images</span>
+                        </div>
+                        <div class="history-stats">
+                            <div><strong>{{ run.defective_count }}</strong><span>Defective</span></div>
+                            <div><strong>{{ run.good_count }}</strong><span>Good</span></div>
+                            <div><strong>{{ '%.2f'|format(run.avg_latency) }} ms</strong><span>Avg latency</span></div>
+                            <div><strong>{{ '%.2f'|format(run.total_time_sec) }} s</strong><span>Total time</span></div>
+                        </div>
+                        <div class="history-footer">Folder: {{ run.test_folder }}</div>
+                    </article>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         {% if results %}
         <div class="card">
             <h3>Inference Summary</h3>

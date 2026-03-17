@@ -252,8 +252,9 @@ h3 {
 }
 
 .msg.success::before {
-    content: "✓";
-    font-size: 20px;
+    content: "OK";
+    font-size: 12px;
+    font-weight: 700;
 }
 
 .msg.error {
@@ -467,6 +468,107 @@ tbody tr:last-child td {
     text-transform: uppercase;
 }
 
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.section-copy {
+    color: var(--text-muted);
+    margin-top: -4px;
+}
+
+.history-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+}
+
+.history-card-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.history-card {
+    height: 100%;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.history-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(59, 130, 246, 0.45);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.history-card-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.history-title {
+    font-size: 1.1em;
+    font-weight: 700;
+}
+
+.history-time {
+    color: var(--text-muted);
+    font-size: 0.88em;
+    margin-top: 6px;
+}
+
+.history-pill {
+    white-space: nowrap;
+    border: 1px solid rgba(102, 187, 106, 0.25);
+    color: var(--operator-badge);
+    background: rgba(102, 187, 106, 0.08);
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 0.82em;
+    font-weight: 600;
+}
+
+.history-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.history-stats div {
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.history-stats strong {
+    display: block;
+    color: var(--orange);
+    font-size: 1.05em;
+}
+
+.history-stats span {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.82em;
+    margin-top: 4px;
+}
+
+.history-footer {
+    margin-top: 16px;
+    color: var(--text-muted);
+    font-size: 0.85em;
+    word-break: break-word;
+}
+
 #loading-overlay,
 #training-loading-overlay {
     display: none;
@@ -515,10 +617,17 @@ tbody tr:last-child td {
 
     table {
         font-size: 0.9em;
+        display: block;
+        overflow-x: auto;
     }
 
     th,
     td {
         padding: 10px;
+    }
+
+    .section-header,
+    .history-card-top {
+        flex-direction: column;
     }
 }

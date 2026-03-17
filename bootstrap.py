@@ -14,4 +14,5 @@ def create_initial_users(app) -> None:
             db.session.commit()
 
     os.makedirs(os.path.join(app.root_path, "static", "results"), exist_ok=True)
-    os.makedirs(os.path.join(app.root_path, "inspection_model_outputs"), exist_ok=True)
+    os.makedirs(app.config["MODEL_OUTPUT_DIR"], exist_ok=True)
+    os.makedirs(app.config["LEGACY_MODEL_OUTPUT_DIR"], exist_ok=True)

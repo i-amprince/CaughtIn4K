@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inspection History</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <canvas id="flame-canvas"></canvas>
+    <header>
+        <div class="logo-section">
+            <div class="logo">AQI</div>
+            <span class="system-title">Inspection Run Details</span>
+        </div>
+        <div class="user-section">
+            <a href="{{ url_for('dashboard.dashboard') }}" class="logout-btn">Back to Dashboard</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <div class="section-header">
+                <div>
+                    <h3>{{ run.item_name|title }} - Run #{{ run.id }}</h3>
+                    <p class="section-copy">Saved on {{ run.created_at.strftime('%d %b %Y, %I:%M %p') }} by {{ run.operator.username }}</p>
+                </div>
+                <span class="history-pill">{{ run.total_images }} images</span>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value">{{ run.defective_count }}</div>
+                    <div class="stat-label">Defective</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ run.good_count }}</div>
+                    <div class="stat-label">Good</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ '%.2f'|format(run.avg_latency) }}ms</div>
+                    <div class="stat-label">Avg. Latency</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ '%.2f'|format(run.total_time_sec) }}s</div>
+                    <div class="stat-label">Total Time</div>
+                </div>
+            </div>
+
+            <p class="section-copy">Test folder: {{ run.test_folder }}</p>
+        </div>
+
+        <div class="card">
+            <h3>Full Image History</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Image File</th>
+                        <th>Category</th>
+                        <th>Anomaly Score</th>
+                        <th>Status</th>
+                        <th>Defect Heatmap</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in run.results %}
+                    <tr>
+                        <td>{{ result.img_name }}</td>
+                        <td>{{ result.defect_category }}</td>
+                        <td>{{ result.score }}</td>
+                        <td>
+                            {% if 'DEFECTIVE' in result.status %}
+                                <span style="color: #ff3838; font-weight: bold;">{{ result.status }}</span>
+                            {% else %}
+                                <span style="color: #10b981; font-weight: bold;">{{ result.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <img src="{{ url_for('static', filename=result.heatmap_url) }}" alt="Heatmap" class="heatmap-img">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
