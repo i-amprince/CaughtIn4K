@@ -1,11 +1,12 @@
 from flask import Blueprint, abort, render_template
 from flask_login import current_user, login_required
 
-from models import InspectionRun, User
+from models import InspectionRun, User, HumanReview
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
 
+# ================= DASHBOARD =================
 @dashboard_bp.route("/dashboard")
 @login_required
 def dashboard():
@@ -30,12 +31,30 @@ def dashboard():
     )
 
 
+# ================= HISTORY DETAIL WITH HITL =================
 @dashboard_bp.route("/history/<int:run_id>")
 @login_required
 def history_detail(run_id: int):
     run = InspectionRun.query.get_or_404(run_id)
 
+    # 🔐 SECURITY CHECK (keep your logic intact)
     if current_user.role != "Quality Operator" or run.operator_id != current_user.id:
         abort(403)
 
-    return render_template("history_detail.html", user=current_user, run=run)
+    # 🔥 FETCH HUMAN REVIEWS
+    reviews = HumanReview.query.all()
+
+    # 🔥 MAP: image_name → review object
+    review_map = {}
+
+    for r in reviews:
+        # extract filename from "results/xxx.png"
+        img_name = r.img_path.split("/")[-1]
+        review_map[img_name] = r
+
+    return render_template(
+        "history_detail.html",
+        user=current_user,
+        run=run,
+        review_map=review_map,   # ⭐ NEW (important)
+    )

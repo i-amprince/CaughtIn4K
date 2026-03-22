@@ -7,6 +7,7 @@
 </head>
 <body>
     <canvas id="flame-canvas"></canvas>
+
     <header>
         <div class="logo-section">
             <div class="logo">AQI</div>
@@ -22,6 +23,7 @@
     </header>
 
     <div class="container">
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -30,6 +32,7 @@
             {% endif %}
         {% endwith %}
 
+        <!-- ================= ADMIN ================= -->
         {% if user.role == 'System Administrator' %}
         <div class="card">
             <h3>Add New User</h3>
@@ -45,6 +48,7 @@
                 <button type="submit" class="add-btn">Add User</button>
             </form>
         </div>
+
         <div class="card">
             <h3>User Management</h3>
             <table>
@@ -76,29 +80,47 @@
         </div>
         {% endif %}
 
+
+        <!-- ================= ENGINEER ================= -->
         {% if user.role == 'Manufacturing Engineer' %}
         <div class="card">
             <h3>Train New Anomaly Detection Model</h3>
             <p style="color: var(--text-muted); margin-bottom: 20px;">
-                Provide the root path to the MVTec dataset and the name of the item sub-folder to begin training.
+                Provide dataset path and item name.
             </p>
 
-            <form action="{{ url_for('ml.start_training') }}" method="POST" class="form-inline" onsubmit="document.getElementById('training-loading-overlay').style.display='block';">
-                <input type="text" name="dataset_path" placeholder="MVTec Dataset Root Path (e.g., C:/.../mvtec_anomaly_detection)" required style="grid-column: 1 / 3;">
-                <input type="text" name="item_name" placeholder="Item Name (e.g., bottle)" required>
-                <button type="submit" class="add-btn" style="background: var(--engineer-badge);">Start Training</button>
+            <form action="{{ url_for('ml.start_training') }}" method="POST" class="form-inline">
+                <input type="text" name="dataset_path" placeholder="Dataset Path" required style="grid-column: 1 / 3;">
+                <input type="text" name="item_name" placeholder="Item Name" required>
+                <button type="submit" class="add-btn" style="background: var(--engineer-badge);">
+                    Start Training
+                </button>
             </form>
-
-            <div id="training-loading-overlay">
-                Training in progress... This will take a significant amount of time and the page will be unresponsive. Please do not close this tab.
-            </div>
         </div>
         {% endif %}
 
+
+        <!-- ================= QUALITY OPERATOR ================= -->
         {% if user.role == 'Quality Operator' %}
+
+        <!-- 🔥 NEW REVIEW BUTTON -->
+        <div class="card">
+            <h3>Human Review</h3>
+            <p style="color: var(--text-muted); margin-bottom: 15px;">
+                Review AI predictions and correct false positives / false negatives.
+            </p>
+
+            <a href="/review" class="start-btn">
+                Go to Review Panel
+            </a>
+        </div>
+
         <div class="card">
             <h3>Run Batch Inspection</h3>
-            <p style="color: var(--text-muted); margin-bottom: 20px;">Enter the absolute path to your test dataset folder.</p>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">
+                Enter test dataset path.
+            </p>
+
             <form action="{{ url_for('ml.run_inspection') }}" method="POST">
                 <input type="text" name="item_name" placeholder="Item Name (e.g., bottle)" required>
                 <input type="text" name="test_folder" placeholder="Path to test images" required>
@@ -106,18 +128,15 @@
             </form>
 
             <div id="loading-overlay">
-                Running PyTorch Inference... Please wait. This may take a moment.
+                Running inference...
             </div>
         </div>
 
+
+        <!-- HISTORY -->
         {% if history_runs %}
         <div class="card">
-            <div class="section-header">
-                <div>
-                    <h3>Recent Inspection History</h3>
-                    <p class="section-copy">Each card is one saved run. Open a card to see the full image-by-image history.</p>
-                </div>
-            </div>
+            <h3>Recent Inspection History</h3>
 
             <div class="history-grid">
                 {% for run in history_runs %}
@@ -126,17 +145,23 @@
                         <div class="history-card-top">
                             <div>
                                 <div class="history-title">{{ run.item_name|title }}</div>
-                                <div class="history-time">Run #{{ run.id }} - {{ run.created_at.strftime('%d %b %Y, %I:%M %p') }}</div>
+                                <div class="history-time">
+                                    Run #{{ run.id }} - {{ run.created_at.strftime('%d %b %Y, %I:%M %p') }}
+                                </div>
                             </div>
                             <span class="history-pill">{{ run.total_images }} images</span>
                         </div>
+
                         <div class="history-stats">
                             <div><strong>{{ run.defective_count }}</strong><span>Defective</span></div>
                             <div><strong>{{ run.good_count }}</strong><span>Good</span></div>
-                            <div><strong>{{ '%.2f'|format(run.avg_latency) }} ms</strong><span>Avg latency</span></div>
-                            <div><strong>{{ '%.2f'|format(run.total_time_sec) }} s</strong><span>Total time</span></div>
+                            <div><strong>{{ '%.2f'|format(run.avg_latency) }} ms</strong><span>Latency</span></div>
+                            <div><strong>{{ '%.2f'|format(run.total_time_sec) }} s</strong><span>Total</span></div>
                         </div>
-                        <div class="history-footer">Folder: {{ run.test_folder }}</div>
+
+                        <div class="history-footer">
+                            Folder: {{ run.test_folder }}
+                        </div>
                     </article>
                 </a>
                 {% endfor %}
@@ -144,36 +169,20 @@
         </div>
         {% endif %}
 
+
+        <!-- RESULTS -->
         {% if results %}
         <div class="card">
             <h3>Inference Summary</h3>
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-value">{{ summary.total }}</div>
-                    <div class="stat-label">Images Processed</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{{ summary.avg_latency }}ms</div>
-                    <div class="stat-label">Avg. Latency</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{{ summary.fps }}</div>
-                    <div class="stat-label">Est. FPS</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{{ summary.total_time_sec }}s</div>
-                    <div class="stat-label">Total Time</div>
-                </div>
-            </div>
 
             <table>
                 <thead>
                     <tr>
-                        <th>Image File</th>
+                        <th>Image</th>
                         <th>Category</th>
-                        <th>Anomaly Score</th>
+                        <th>Score</th>
                         <th>Status</th>
-                        <th>Defect Heatmap</th>
+                        <th>Heatmap</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -184,13 +193,13 @@
                         <td>{{ res.score }}</td>
                         <td>
                             {% if 'DEFECTIVE' in res.status %}
-                                <span style="color: #ff3838; font-weight: bold;">{{ res.status }}</span>
+                                <span style="color:#ff3838; font-weight:bold;">{{ res.status }}</span>
                             {% else %}
-                                <span style="color: #10b981; font-weight: bold;">{{ res.status }}</span>
+                                <span style="color:#10b981; font-weight:bold;">{{ res.status }}</span>
                             {% endif %}
                         </td>
                         <td>
-                            <img src="{{ url_for('static', filename=res.heatmap_url) }}" alt="Heatmap" class="heatmap-img">
+                            <img src="{{ url_for('static', filename=res.heatmap_url) }}" class="heatmap-img">
                         </td>
                     </tr>
                     {% endfor %}
@@ -198,7 +207,9 @@
             </table>
         </div>
         {% endif %}
+
         {% endif %}
+
     </div>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>

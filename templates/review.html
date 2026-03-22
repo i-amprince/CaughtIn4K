@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Human Review Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+
+<header>
+    <div class="logo-section">
+        <div class="logo">AQI</div>
+        <span class="system-title">Human Review Panel</span>
+    </div>
+    <div class="user-section">
+        <a href="{{ url_for('dashboard.dashboard') }}" class="logout-btn">Back to Dashboard</a>
+    </div>
+</header>
+
+<div class="container">
+
+    <div class="card">
+        <h3>Pending Reviews</h3>
+
+        {% for item in items %}
+        <div style="border:1px solid #333; padding:20px; margin:20px; border-radius:10px;">
+
+            <img src="{{ url_for('static', filename=item.img_path) }}" class="heatmap-img"><br><br>
+
+            <b>Model Prediction:</b> {{ item.predicted_label }} <br>
+            <b>Confidence:</b> {{ item.confidence }} <br><br>
+
+            <form method="POST" action="/submit_review/{{ item.id }}">
+
+                <button name="is_correct" value="yes" style="background:#10b981; color:white;">
+                    ✔ Correct
+                </button>
+
+                <br><br>
+
+                <input type="text" name="correct_label" placeholder="Correct label if wrong">
+
+                <button name="is_correct" value="no" style="background:#ef4444; color:white;">
+                    ❌ Incorrect
+                </button>
+
+            </form>
+        </div>
+        {% endfor %}
+
+    </div>
+
+</div>
+
+</body>
+</html>

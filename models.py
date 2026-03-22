@@ -1,7 +1,5 @@
 from datetime import datetime
-
 from flask_login import UserMixin
-
 from extensions import db, login_manager
 
 
@@ -43,6 +41,18 @@ class InspectionImageResult(db.Model):
     score = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(50), nullable=False)
     heatmap_url = db.Column(db.String(500), nullable=False)
+
+
+# 🔥 HUMAN-IN-THE-LOOP MODEL
+class HumanReview(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    img_path = db.Column(db.String(500), nullable=False)
+    predicted_label = db.Column(db.String(50), nullable=False)
+    confidence = db.Column(db.Float, nullable=False)
+
+    human_label = db.Column(db.String(50))
+    is_correct = db.Column(db.Boolean)
+    reviewed = db.Column(db.Boolean, default=False)
 
 
 @login_manager.user_loader

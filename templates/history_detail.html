@@ -2,88 +2,110 @@
 <html>
 <head>
     <title>Inspection History</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
 <body>
-    <canvas id="flame-canvas"></canvas>
-    <header>
-        <div class="logo-section">
-            <div class="logo">AQI</div>
-            <span class="system-title">Inspection Run Details</span>
-        </div>
-        <div class="user-section">
-            <a href="{{ url_for('dashboard.dashboard') }}" class="logout-btn">Back to Dashboard</a>
-        </div>
-    </header>
 
-    <div class="container">
-        <div class="card">
-            <div class="section-header">
-                <div>
-                    <h3>{{ run.item_name|title }} - Run #{{ run.id }}</h3>
-                    <p class="section-copy">Saved on {{ run.created_at.strftime('%d %b %Y, %I:%M %p') }} by {{ run.operator.username }}</p>
-                </div>
-                <span class="history-pill">{{ run.total_images }} images</span>
-            </div>
+<header>
+    <div class="logo-section">
+        <div class="logo">AQI</div>
+        <span class="system-title">Inspection Run Details</span>
+    </div>
+    <div class="user-section">
+        <a href="{{ url_for('dashboard.dashboard') }}" class="logout-btn">Back</a>
+    </div>
+</header>
 
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-value">{{ run.defective_count }}</div>
-                    <div class="stat-label">Defective</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{{ run.good_count }}</div>
-                    <div class="stat-label">Good</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{{ '%.2f'|format(run.avg_latency) }}ms</div>
-                    <div class="stat-label">Avg. Latency</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{{ '%.2f'|format(run.total_time_sec) }}s</div>
-                    <div class="stat-label">Total Time</div>
-                </div>
-            </div>
+<div class="container">
 
-            <p class="section-copy">Test folder: {{ run.test_folder }}</p>
-        </div>
+    <!-- 🔥 STATS -->
+    <div class="card">
+        <h3>Review Analytics</h3>
 
-        <div class="card">
-            <h3>Full Image History</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Image File</th>
-                        <th>Category</th>
-                        <th>Anomaly Score</th>
-                        <th>Status</th>
-                        <th>Defect Heatmap</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for result in run.results %}
-                    <tr>
-                        <td>{{ result.img_name }}</td>
-                        <td>{{ result.defect_category }}</td>
-                        <td>{{ result.score }}</td>
-                        <td>
-                            {% if 'DEFECTIVE' in result.status %}
-                                <span style="color: #ff3838; font-weight: bold;">{{ result.status }}</span>
-                            {% else %}
-                                <span style="color: #10b981; font-weight: bold;">{{ result.status }}</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <img src="{{ url_for('static', filename=result.heatmap_url) }}" alt="Heatmap" class="heatmap-img">
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        {% set total = run.results|length %}
+        {% set reviewed = 0 %}
+        {% set correct = 0 %}
+
+        {% for r in run.results %}
+            {% if r.img_name in review_map %}
+                {% if review_map[r.img_name].reviewed %}
+                    {% set reviewed = reviewed + 1 %}
+                    {% if review_map[r.img_name].is_correct %}
+                        {% set correct = correct + 1 %}
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+
+        <p>Total Images: {{ total }}</p>
+        <p>Reviewed: {{ reviewed }}</p>
+        <p>Pending: {{ total - reviewed }}</p>
+
+        {% if reviewed > 0 %}
+        <p>Accuracy: {{ ((correct / reviewed) * 100) | round(2) }}%</p>
+        {% endif %}
     </div>
 
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <!-- 🔥 TABLE -->
+    <div class="card">
+        <h3>Full Image History</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Image</th>
+                    <th>Category</th>
+                    <th>Score</th>
+                    <th>Model Status</th>
+                    <th>Review Status</th>
+                    <th>Heatmap</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for result in run.results %}
+                {% set review = review_map.get(result.img_name) %}
+
+                <tr>
+                    <td>{{ result.img_name }}</td>
+                    <td>{{ result.defect_category }}</td>
+                    <td>{{ result.score }}</td>
+
+                    <!-- MODEL -->
+                    <td>
+                        {% if 'DEFECTIVE' in result.status %}
+                            <span style="color:#ff3838;">{{ result.status }}</span>
+                        {% else %}
+                            <span style="color:#10b981;">{{ result.status }}</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- 🔥 REVIEW STATUS -->
+                    <td>
+                        {% if review %}
+                            {% if not review.reviewed %}
+                                <span style="color:orange;">PENDING</span>
+                            {% elif review.is_correct %}
+                                <span style="color:#10b981;">✔ CORRECT</span>
+                            {% else %}
+                                <span style="color:#ef4444;">❌ WRONG → {{ review.human_label }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span style="color:gray;">NO REVIEW</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <img src="{{ url_for('static', filename=result.heatmap_url) }}" class="heatmap-img">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+
+</div>
+
 </body>
 </html>
