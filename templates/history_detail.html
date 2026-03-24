@@ -18,35 +18,35 @@
 
 <div class="container">
 
-    <!-- 🔥 STATS -->
+    <!-- 🔥 REVIEW ANALYTICS -->
     <div class="card">
         <h3>Review Analytics</h3>
 
-        {% set total = run.results|length %}
-        {% set reviewed = 0 %}
-        {% set correct = 0 %}
+        {% set stats = namespace(total=run.results|length, reviewed=0, correct=0) %}
 
         {% for r in run.results %}
-            {% if r.img_name in review_map %}
-                {% if review_map[r.img_name].reviewed %}
-                    {% set reviewed = reviewed + 1 %}
-                    {% if review_map[r.img_name].is_correct %}
-                        {% set correct = correct + 1 %}
-                    {% endif %}
+            {% set review = review_map.get(r.img_name) %}
+
+            {% if review and review.reviewed %}
+                {% set stats.reviewed = stats.reviewed + 1 %}
+
+                {% if review.is_correct %}
+                    {% set stats.correct = stats.correct + 1 %}
                 {% endif %}
             {% endif %}
         {% endfor %}
 
-        <p>Total Images: {{ total }}</p>
-        <p>Reviewed: {{ reviewed }}</p>
-        <p>Pending: {{ total - reviewed }}</p>
+        <p>Total Images: {{ stats.total }}</p>
+        <p>Reviewed: {{ stats.reviewed }}</p>
+        <p>Pending: {{ stats.total - stats.reviewed }}</p>
 
-        {% if reviewed > 0 %}
-        <p>Accuracy: {{ ((correct / reviewed) * 100) | round(2) }}%</p>
+        {% if stats.reviewed > 0 %}
+        <p>Accuracy: {{ ((stats.correct / stats.reviewed) * 100) | round(2) }}%</p>
         {% endif %}
     </div>
 
-    <!-- 🔥 TABLE -->
+
+    <!-- 🔥 FULL IMAGE TABLE -->
     <div class="card">
         <h3>Full Image History</h3>
 
@@ -71,12 +71,12 @@
                     <td>{{ result.defect_category }}</td>
                     <td>{{ result.score }}</td>
 
-                    <!-- MODEL -->
+                    <!-- MODEL STATUS -->
                     <td>
                         {% if 'DEFECTIVE' in result.status %}
-                            <span style="color:#ff3838;">{{ result.status }}</span>
+                            <span style="color:#ff3838; font-weight:bold;">{{ result.status }}</span>
                         {% else %}
-                            <span style="color:#10b981;">{{ result.status }}</span>
+                            <span style="color:#10b981; font-weight:bold;">{{ result.status }}</span>
                         {% endif %}
                     </td>
 
@@ -84,17 +84,22 @@
                     <td>
                         {% if review %}
                             {% if not review.reviewed %}
-                                <span style="color:orange;">PENDING</span>
+                                <span style="color:orange;">⏳ PENDING</span>
+
                             {% elif review.is_correct %}
                                 <span style="color:#10b981;">✔ CORRECT</span>
+
                             {% else %}
-                                <span style="color:#ef4444;">❌ WRONG → {{ review.human_label }}</span>
+                                <span style="color:#ef4444;">
+                                    ❌ WRONG → {{ review.human_label }}
+                                </span>
                             {% endif %}
                         {% else %}
                             <span style="color:gray;">NO REVIEW</span>
                         {% endif %}
                     </td>
 
+                    <!-- HEATMAP -->
                     <td>
                         <img src="{{ url_for('static', filename=result.heatmap_url) }}" class="heatmap-img">
                     </td>

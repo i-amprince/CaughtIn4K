@@ -47,6 +47,8 @@ class InspectionImageResult(db.Model):
 class HumanReview(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     img_path = db.Column(db.String(500), nullable=False)
+    img_name = db.Column(db.String(255))   # ⭐ NEW
+
     predicted_label = db.Column(db.String(50), nullable=False)
     confidence = db.Column(db.Float, nullable=False)
 

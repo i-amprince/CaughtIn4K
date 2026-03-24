@@ -124,8 +124,8 @@ def train_local_item_model(mvtec_dataset_path: str, item_name: str, base_output_
 
 
 if __name__ == "__main__":
-    LOCAL_MVTEC_ROOT = r"C:/Users/shikh/Downloads/mvtec_anomaly_detection"
-    LOCAL_OUTPUTS = r"C:/Users/shikh/OneDrive/Desktop/Computer Vision/CaughtIn4K/inspection_model_outputs"
+    LOCAL_MVTEC_ROOT = r"D:/sem 6/Software Eng Lab/CaughtIn4K/mvtec_anomaly_detection"
+    LOCAL_OUTPUTS = r"D:/sem 6/Software Eng Lab/CaughtIn4K/inspection_model_outputs"
     ITEM_TO_TRAIN = "bottle"
 
     if os.path.exists(LOCAL_MVTEC_ROOT):

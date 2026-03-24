@@ -84,8 +84,13 @@ def run_inferencer_batch(deployment_model_path, test_folder_root, output_dir):
         # 🔥 STORE EVERY IMAGE FOR REVIEW
         review_entry = HumanReview(
             img_path=f"results/{out_name}",
+            # ⭐ ADD THIS LINE (VERY IMPORTANT)
+            img_name=os.path.basename(img_path),
             predicted_label=predicted_label,
             confidence=score,
+            human_label=None,
+            is_correct=None,
+            reviewed=False,
         )
         db.session.add(review_entry)
 

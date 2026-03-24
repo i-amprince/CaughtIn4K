@@ -37,24 +37,23 @@ def dashboard():
 def history_detail(run_id: int):
     run = InspectionRun.query.get_or_404(run_id)
 
-    # 🔐 SECURITY CHECK (keep your logic intact)
     if current_user.role != "Quality Operator" or run.operator_id != current_user.id:
         abort(403)
 
-    # 🔥 FETCH HUMAN REVIEWS
-    reviews = HumanReview.query.all()
+    # ✅ only reviews related to THIS run
+    run_img_names = [r.img_name for r in run.results]
 
-    # 🔥 MAP: image_name → review object
+    reviews = HumanReview.query.filter(HumanReview.img_name.in_(run_img_names)).all()
+
     review_map = {}
 
     for r in reviews:
-        # extract filename from "results/xxx.png"
-        img_name = r.img_path.split("/")[-1]
-        review_map[img_name] = r
+        if r.img_name:
+            review_map[r.img_name] = r
 
     return render_template(
         "history_detail.html",
         user=current_user,
         run=run,
-        review_map=review_map,   # ⭐ NEW (important)
+        review_map=review_map,
     )
