@@ -1,17 +1,13 @@
 import os
 
+from auth_helpers import sync_bootstrap_admins
 from extensions import db
-from models import User
 
 
 def create_initial_users(app) -> None:
     with app.app_context():
         db.create_all()
-        if not User.query.filter_by(username="admin").first():
-            db.session.add(User(username="admin", password="123", role="System Administrator"))
-            db.session.add(User(username="inspector", password="123", role="Quality Operator"))
-            db.session.add(User(username="engineer", password="123", role="Manufacturing Engineer"))
-            db.session.commit()
+        sync_bootstrap_admins(app.config.get("GOOGLE_OAUTH_BOOTSTRAP_ADMIN_EMAILS", []))
 
     os.makedirs(os.path.join(app.root_path, "static", "results"), exist_ok=True)
     os.makedirs(app.config["MODEL_OUTPUT_DIR"], exist_ok=True)

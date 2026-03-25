@@ -88,13 +88,14 @@ def train_local_item_model(mvtec_dataset_path: str, item_name: str, base_output_
     print(f"Using local MVTec dataset located at: {os.path.abspath(mvtec_dataset_path)}")
     _patch_anomalib_versioned_dir_for_windows()
     _validate_mvtec_item_structure(mvtec_dataset_path, item_name)
+    num_workers = 0 if os.name == "nt" else 4
 
     datamodule = MVTec(
         root=mvtec_dataset_path,
         category=item_name,
         train_batch_size=32,
         eval_batch_size=32,
-        num_workers=4,
+        num_workers=num_workers,
     )
 
     model = Patchcore(backbone="wide_resnet50_2", pre_trained=True)
