@@ -6,12 +6,18 @@ from models import InspectionRun, User, HumanReview
 dashboard_bp = Blueprint("dashboard", __name__)
 
 
-# ================= DASHBOARD =================
 @dashboard_bp.route("/dashboard")
 @login_required
 def dashboard():
-    all_users = User.query.all() if current_user.role == "System Administrator" else []
+    all_users = []
     history_runs = []
+
+    if current_user.role == "System Administrator":
+        all_users = (
+            User.query.filter(User.username.contains("@"))
+            .order_by(User.role.asc(), User.username.asc())
+            .all()
+        )
 
     if current_user.role == "Quality Operator":
         history_runs = (
@@ -31,7 +37,6 @@ def dashboard():
     )
 
 
-# ================= HISTORY DETAIL WITH HITL =================
 @dashboard_bp.route("/history/<int:run_id>")
 @login_required
 def history_detail(run_id: int):
@@ -40,16 +45,13 @@ def history_detail(run_id: int):
     if current_user.role != "Quality Operator" or run.operator_id != current_user.id:
         abort(403)
 
-    # ✅ only reviews related to THIS run
     run_img_names = [r.img_name for r in run.results]
-
     reviews = HumanReview.query.filter(HumanReview.img_name.in_(run_img_names)).all()
 
     review_map = {}
-
-    for r in reviews:
-        if r.img_name:
-            review_map[r.img_name] = r
+    for review in reviews:
+        if review.img_name:
+            review_map[review.img_name] = review
 
     return render_template(
         "history_detail.html",

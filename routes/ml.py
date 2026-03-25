@@ -5,8 +5,6 @@ from flask_login import current_user, login_required
 
 from extensions import db
 from models import InspectionImageResult, InspectionRun
-from run_model import run_inferencer_batch
-from training import train_local_item_model
 
 ml_bp = Blueprint("ml", __name__)
 
@@ -46,8 +44,10 @@ def start_training():
     if not base_output_dir:
         flash("Error: Model output directory not configured. Contact system administrator.", "error")
         return redirect(url_for("dashboard.dashboard"))
-    
+
     try:
+        from training import train_local_item_model
+
         flash(f"Training started for '{item_name}'. Please wait...", "success")
         final_path = train_local_item_model(dataset_path, item_name, base_output_dir)
         flash(f"Training completed! Model ready at: {final_path}", "success")
@@ -74,6 +74,8 @@ def run_inspection():
     output_dir = os.path.join(current_app.root_path, "static", "results")
 
     try:
+        from run_model import run_inferencer_batch
+
         results_data, summary = run_inferencer_batch(model_path, test_folder, output_dir)
 
         inspection_run = InspectionRun(

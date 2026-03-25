@@ -32,31 +32,33 @@
             {% endif %}
         {% endwith %}
 
-        <!-- ================= ADMIN ================= -->
         {% if user.role == 'System Administrator' %}
         <div class="card">
-            <h3>Add New User</h3>
+            <h3>Authorize Google User</h3>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">
+                Add the user's Google email and assign a role. They will sign in through Google only, with no local password.
+            </p>
             <form action="{{ url_for('admin.create_user') }}" method="POST" class="form-inline">
-                <input type="text" name="username" placeholder="Username" required>
-                <input type="password" name="password" placeholder="Password" required>
+                <input type="email" name="email" placeholder="Google email address" required>
                 <select name="role" required>
                     <option value="" disabled selected>Select Role</option>
                     <option value="Quality Operator">Quality Operator</option>
                     <option value="Manufacturing Engineer">Manufacturing Engineer</option>
                     <option value="System Administrator">System Administrator</option>
                 </select>
-                <button type="submit" class="add-btn">Add User</button>
+                <button type="submit" class="add-btn">Save Access</button>
             </form>
         </div>
 
         <div class="card">
-            <h3>User Management</h3>
+            <h3>Authorized Google Accounts</h3>
             <table>
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Username</th>
+                        <th>Email</th>
                         <th>Role</th>
+                        <th>Sign-In</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -73,6 +75,7 @@
                                 <span class="badge badge-op">{{ u.role }}</span>
                             {% endif %}
                         </td>
+                        <td>Google OAuth</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -80,8 +83,6 @@
         </div>
         {% endif %}
 
-
-        <!-- ================= ENGINEER ================= -->
         {% if user.role == 'Manufacturing Engineer' %}
         <div class="card">
             <h3>Train New Anomaly Detection Model</h3>
@@ -99,11 +100,7 @@
         </div>
         {% endif %}
 
-
-        <!-- ================= QUALITY OPERATOR ================= -->
         {% if user.role == 'Quality Operator' %}
-
-        <!-- 🔥 NEW REVIEW BUTTON -->
         <div class="card">
             <h3>Human Review</h3>
             <p style="color: var(--text-muted); margin-bottom: 15px;">
@@ -132,8 +129,6 @@
             </div>
         </div>
 
-
-        <!-- HISTORY -->
         {% if history_runs %}
         <div class="card">
             <h3>Recent Inspection History</h3>
@@ -169,8 +164,6 @@
         </div>
         {% endif %}
 
-
-        <!-- RESULTS -->
         {% if results %}
         <div class="card">
             <h3>Inference Summary</h3>

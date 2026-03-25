@@ -1,5 +1,6 @@
 __pycache__/
 *.py[cod]
+.env
 
 inspection_model_outputs/
 static/results/
