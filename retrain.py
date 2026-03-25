@@ -280,3 +280,116 @@ def _strip_heatmap(img_path: str) -> np.ndarray:
     if img is None:
         raise ValueError(f"Could not read image: {img_path!r}")
     return img
+
+
+# ---------------------------------------------------------------------------
+# Batch retraining (called from routes/review.py after threshold is reached)
+# ---------------------------------------------------------------------------
+
+def retrain_on_batch(
+    corrections: list,
+    base_output_dir: str,
+    dataset_root: str,
+) -> dict:
+    """
+    Process a batch of human corrections and retrain the model once for each
+    unique item_name found in the batch.
+
+    Parameters
+    ----------
+    corrections     : list of dicts, each with keys:
+                        img_path, correct_label, predicted_label, item_name
+    base_output_dir : root folder where model weights live
+    dataset_root    : root of the MVTec-style dataset used for training
+
+    Returns
+    -------
+    dict with keys: success (bool), message (str), model_path (str | None)
+    """
+    if not corrections:
+        return {"success": False, "message": "No corrections supplied.", "model_path": None}
+
+    print(
+        f"[Retrain] Processing batch of {len(corrections)} correction(s).",
+        flush=True,
+    )
+
+    errors = []
+    last_model_path = None
+
+    # Stage 1 – copy each corrected image into the dataset
+    for corr in corrections:
+        img_path        = corr["img_path"]
+        correct_label   = corr.get("correct_label", "").strip().upper()
+        predicted_label = corr.get("predicted_label", "").strip().upper()
+        item_name       = (corr.get("item_name") or "").strip().lower()
+
+        if not item_name:
+            errors.append(f"Skipped {img_path}: item_name unknown.")
+            continue
+
+        abs_img_path = _resolve_image_path(img_path)
+        if not abs_img_path or not os.path.exists(abs_img_path):
+            errors.append(f"Skipped {img_path}: file not found.")
+            continue
+
+        try:
+            if correct_label == "GOOD" and predicted_label == "DEFECTIVE":
+                # False-positive: add to train/good
+                train_good_dir = Path(dataset_root) / item_name / "train" / "good"
+                train_good_dir.mkdir(parents=True, exist_ok=True)
+                dest_name = f"correction_{int(time.time())}_{Path(abs_img_path).name}"
+                cv2.imwrite(str(train_good_dir / dest_name), _strip_heatmap(abs_img_path))
+                log.info("[Retrain] Staged false-positive image: %s", dest_name)
+
+            elif correct_label == "DEFECTIVE" and predicted_label == "GOOD":
+                # False-negative: add to test/correction_defects + generate mask
+                defect_dir = Path(dataset_root) / item_name / "test" / "correction_defects"
+                mask_dir   = Path(dataset_root) / item_name / "ground_truth" / "correction_defects"
+                defect_dir.mkdir(parents=True, exist_ok=True)
+                mask_dir.mkdir(parents=True, exist_ok=True)
+
+                dest_name  = f"correction_{int(time.time())}_{Path(abs_img_path).name}"
+                mask_name  = dest_name.replace(".png", "_mask.png").replace(".jpg", "_mask.png")
+                clean_img  = _strip_heatmap(abs_img_path)
+                cv2.imwrite(str(defect_dir / dest_name), clean_img)
+                h, w = clean_img.shape[:2]
+                cv2.imwrite(str(mask_dir / mask_name), np.ones((h, w), dtype=np.uint8) * 255)
+                log.info("[Retrain] Staged false-negative image: %s", dest_name)
+            else:
+                log.warning(
+                    "[Retrain] Skipping %s: predicted=%s correct=%s (nothing to do).",
+                    img_path, predicted_label, correct_label,
+                )
+        except Exception as exc:
+            errors.append(f"Error staging {img_path}: {exc}")
+            log.exception("[Retrain] Staging error for %s", img_path)
+
+    # Stage 2 – retrain once per unique item_name
+    item_names = {
+        (c.get("item_name") or "").strip().lower()
+        for c in corrections
+        if (c.get("item_name") or "").strip()
+    }
+
+    for item_name in item_names:
+        try:
+            model_path = _run_training_epoch(item_name, base_output_dir, dataset_root)
+            last_model_path = model_path
+            log.info("[Retrain] Batch retrain complete for item '%s': %s", item_name, model_path)
+        except Exception as exc:
+            errors.append(f"Retraining failed for item '{item_name}': {exc}")
+            log.exception("[Retrain] Training error for item '%s'", item_name)
+
+    if errors:
+        return {
+            "success": last_model_path is not None,
+            "message": "Batch retrain finished with some errors: " + "; ".join(errors),
+            "model_path": last_model_path,
+        }
+
+    return {
+        "success": True,
+        "message": f"Batch retrain complete for {len(item_names)} item(s).",
+        "model_path": last_model_path,
+    }

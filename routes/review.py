@@ -6,13 +6,31 @@ from extensions import db
 
 review_bp = Blueprint("review", __name__)
 
+# ---------------------------------------------------------------------------
+# Retraining threshold
+# ---------------------------------------------------------------------------
+
+RETRAIN_THRESHOLD = 10  # Number of falsely classified images before retraining triggers
+
 
 @review_bp.route("/review")
 @login_required
 def review_page():
     items = HumanReview.query.filter_by(reviewed=False).order_by(HumanReview.id.desc()).all()
     reviewed_items = HumanReview.query.filter_by(reviewed=True).order_by(HumanReview.id.desc()).limit(20).all()
-    return render_template("review.html", items=items, reviewed_items=reviewed_items)
+
+    # Count how many false classifications are pending retraining
+    false_classifications_pending = HumanReview.query.filter_by(
+        reviewed=True, is_correct=False, retrained=False
+    ).count()
+
+    return render_template(
+        "review.html",
+        items=items,
+        reviewed_items=reviewed_items,
+        false_classifications_pending=false_classifications_pending,
+        retrain_threshold=RETRAIN_THRESHOLD,
+    )
 
 
 @review_bp.route("/submit_review/<int:review_id>", methods=["POST"])
@@ -40,8 +58,8 @@ def submit_review(review_id):
         item.reviewed = True
         db.session.commit()
 
-        # --- Trigger incremental retraining ---
-        _trigger_retrain(item, correct_label)
+        # Check if we've hit the threshold; trigger batched retraining if so
+        _check_and_trigger_batch_retrain()
 
     else:
         flash("Invalid submission.", "error")
@@ -50,55 +68,111 @@ def submit_review(review_id):
 
 
 # ---------------------------------------------------------------------------
-# Internal helper
+# Threshold-based batch retraining
 # ---------------------------------------------------------------------------
 
-def _trigger_retrain(item, correct_label):
-    """Fire incremental retraining for one corrected image."""
-    try:
-        from retrain import retrain_on_correction
+def _check_and_trigger_batch_retrain():
+    """
+    Count falsely classified images that haven't been retrained yet.
+    If the count has reached RETRAIN_THRESHOLD, kick off a background
+    retraining job and mark those items so they aren't counted again.
+    """
+    pending_items = HumanReview.query.filter_by(
+        reviewed=True, is_correct=False, retrained=False
+    ).all()
 
-        base_output_dir = current_app.config.get("MODEL_OUTPUT_DIR", "")
-        dataset_root    = current_app.config.get("DATASET_ROOT", "")
-        item_name       = getattr(item, "item_name", None) or _infer_item_name(item.img_path)
-
-        if not dataset_root:
-            flash(
-                "Correction saved, but DATASET_ROOT is not configured — "
-                "skipping automatic retraining. Set DATASET_ROOT in app.py.",
-                "warning",
-            )
-            return
-
-        if not item_name:
-            flash(
-                "Correction saved, but item name could not be determined — "
-                "skipping automatic retraining.",
-                "warning",
-            )
-            return
-
-        result = retrain_on_correction(
-            img_path        = item.img_path,
-            correct_label   = correct_label,
-            predicted_label = item.predicted_label,
-            item_name       = item_name,
-            base_output_dir = base_output_dir,
-            dataset_root    = dataset_root,
+    if len(pending_items) < RETRAIN_THRESHOLD:
+        remaining = RETRAIN_THRESHOLD - len(pending_items)
+        flash(
+            f"Correction saved. {len(pending_items)}/{RETRAIN_THRESHOLD} false "
+            f"classifications collected — retraining will start after {remaining} more.",
+            "info",
         )
+        return
 
-        if result["success"]:
-            flash(
-                f"Model retrained with your correction! "
-                f"Weights updated at: {result['model_path']}",
-                "retrain",
+    # We have hit (or exceeded) the threshold — mark them and fire the thread
+    for item in pending_items:
+        item.retrained = True
+    db.session.commit()
+
+    flash(
+        f"Threshold of {RETRAIN_THRESHOLD} false classifications reached. "
+        "Retraining started in the background!",
+        "retrain",
+    )
+
+    _launch_retrain_thread(pending_items)
+
+
+def _launch_retrain_thread(items):
+    """
+    Spawn a daemon thread so retraining never blocks the HTTP response.
+    We snapshot everything we need from the app context here, before
+    the thread starts, so there are no SQLAlchemy/session issues.
+    """
+    import threading
+
+    app = current_app._get_current_object()
+
+    # Snapshot the data we need — don't pass SQLAlchemy model objects across threads
+    corrections = [
+        {
+            "img_path":        item.img_path,
+            "correct_label":   item.human_label,
+            "predicted_label": item.predicted_label,
+            "item_name":       getattr(item, "item_name", None) or _infer_item_name(item.img_path),
+        }
+        for item in items
+    ]
+
+    base_output_dir = app.config.get("MODEL_OUTPUT_DIR", "")
+    dataset_root    = app.config.get("DATASET_ROOT", "")
+
+    def _run():
+        with app.app_context():
+            print(
+                f"[Retrain] Retraining started because threshold reached "
+                f"({len(corrections)} false classifications collected).",
+                flush=True,
             )
-        else:
-            flash(f"Correction saved but retraining failed: {result['message']}", "warning")
+            try:
+                from retrain import retrain_on_batch
 
-    except Exception as exc:
-        flash(f"Correction saved but retraining raised an error: {exc}", "warning")
+                if not dataset_root:
+                    print(
+                        "[Retrain] DATASET_ROOT is not configured — retraining aborted.",
+                        flush=True,
+                    )
+                    return
 
+                result = retrain_on_batch(
+                    corrections=corrections,
+                    base_output_dir=base_output_dir,
+                    dataset_root=dataset_root,
+                )
+
+                if result["success"]:
+                    print(
+                        f"[Retrain] Retraining completed. "
+                        f"Weights updated at: {result['model_path']}",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"[Retrain] Retraining completed with errors: {result['message']}",
+                        flush=True,
+                    )
+
+            except Exception as exc:
+                print(f"[Retrain] Retraining failed with exception: {exc}", flush=True)
+
+    thread = threading.Thread(target=_run, daemon=True, name="retrain-worker")
+    thread.start()
+
+
+# ---------------------------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------------------------
 
 def _infer_item_name(img_path):
     """
