@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draw Defect Mask · AQI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <style>
+        /* ── Page layout ─────────────────────────────────────────────────── */
+        body { display: flex; flex-direction: column; min-height: 100vh; }
+
+        .mask-hero {
+            padding: 32px 40px 0;
+            position: relative; z-index: 2;
+        }
+        .mask-hero h1 {
+            font-size: 1.6rem; font-weight: 700;
+            background: linear-gradient(135deg, #fff 0%, var(--orange) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; margin-bottom: 6px;
+        }
+        .mask-hero p { color: var(--text-muted); font-size: 0.88rem; max-width: 620px; }
+
+        .mask-instructions {
+            margin: 16px 40px;
+            background: rgba(251,191,36,0.08);
+            border: 1px solid rgba(251,191,36,0.25);
+            border-radius: 10px;
+            padding: 12px 18px;
+            font-size: 0.82rem;
+            color: #fcd34d;
+            display: flex; align-items: flex-start; gap: 10px;
+            position: relative; z-index: 2;
+        }
+
+        /* ── Canvas workspace ────────────────────────────────────────────── */
+        .canvas-workspace {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 40px 32px;
+            gap: 16px;
+            position: relative; z-index: 2;
+        }
+
+        .canvas-container {
+            position: relative;
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            cursor: crosshair;
+            background: #111;
+            max-width: 100%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        .canvas-container:hover { border-color: rgba(255,107,53,0.4); }
+
+        /* The inspection image rendered underneath */
+        #bg-canvas  { display: block; }
+        /* The red mask the operator draws on top */
+        #draw-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            cursor: crosshair;
+        }
+
+        /* ── Toolbar ─────────────────────────────────────────────────────── */
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .tool-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 8px 14px;
+        }
+        .tool-group label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        .tool-btn {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.8rem;
+            font-family: inherit;
+            padding: 6px 14px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .tool-btn:hover   { background: rgba(255,107,53,0.15); border-color: var(--orange); }
+        .tool-btn.active  { background: rgba(255,107,53,0.25); border-color: var(--orange); color: var(--orange); }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 90px; height: 4px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.15);
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--orange);
+            cursor: pointer;
+        }
+        #brush-size-label { color: #fff; font-size: 0.78rem; min-width: 24px; text-align: right; }
+
+        /* ── Submit / cancel row ─────────────────────────────────────────── */
+        .action-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn-submit-mask {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #fff; border: none; border-radius: 10px;
+            padding: 12px 32px; font-size: 0.9rem; font-weight: 600;
+            font-family: inherit; cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .btn-submit-mask:hover { opacity: 0.9; transform: scale(1.02); }
+        .btn-submit-mask:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+        .btn-cancel {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 24px; font-size: 0.88rem;
+            font-family: inherit; cursor: pointer;
+            transition: color 0.2s, border-color 0.2s;
+            text-decoration: none; display: inline-flex; align-items: center;
+        }
+        .btn-cancel:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+
+        .coverage-hint {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            text-align: center;
+        }
+        .coverage-hint span { color: #fff; font-weight: 600; }
+
+        /* ── Meta chip row ───────────────────────────────────────────────── */
+        .meta-chips {
+            display: flex; gap: 10px; flex-wrap: wrap;
+            padding: 0 40px 4px;
+            position: relative; z-index: 2;
+        }
+        .meta-chip {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+        .meta-chip strong { color: #fff; }
+    </style>
+</head>
+<body>
+<canvas id="flame-canvas"></canvas>
+
+<header>
+    <div class="logo-section">
+        <div class="logo">AQI</div>
+        <span class="system-title">Defect Mask Editor</span>
+    </div>
+    <div class="user-section">
+        <a href="{{ url_for('review.review_page') }}" class="logout-btn">← Back to Review</a>
+    </div>
+</header>
+
+<div class="mask-hero">
+    <h1>Draw the Defect Region</h1>
+    <p>
+        The model classified this image as <strong>GOOD</strong> but you marked it as
+        <strong>DEFECTIVE</strong>. Paint over the defective area so the model learns
+        exactly where the anomaly is — this gives PatchCore precise patch-level ground truth.
+    </p>
+</div>
+
+<!-- Meta chips -->
+<div class="meta-chips">
+    <div class="meta-chip">Review ID: <strong>#{{ item.id }}</strong></div>
+    <div class="meta-chip">Predicted: <strong>{{ item.predicted_label }}</strong></div>
+    <div class="meta-chip">Your label: <strong>{{ item.human_label }}</strong></div>
+    <div class="meta-chip">Anomaly score: <strong>{{ "%.3f"|format(item.confidence) }}</strong></div>
+</div>
+
+<div class="mask-instructions">
+    <span>⚠️</span>
+    <span>
+        <strong>Instructions:</strong> Use the brush to paint red over the defective region.
+        Switch to Eraser to fix mistakes. You must cover at least <strong>0.5%</strong> of
+        the image before submitting. The painted area becomes the ground-truth mask used
+        during model retraining.
+    </span>
+</div>
+
+<!-- Canvas workspace -->
+<div class="canvas-workspace">
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="tool-group">
+            <label>Tool</label>
+            <button class="tool-btn active" id="btn-brush" onclick="setTool('brush')">🖌 Brush</button>
+            <button class="tool-btn"        id="btn-eraser" onclick="setTool('eraser')">✏️ Eraser</button>
+            <button class="tool-btn"        id="btn-clear"  onclick="clearMask()">🗑 Clear</button>
+        </div>
+        <div class="tool-group">
+            <label>Brush size</label>
+            <input type="range" id="brush-size" min="4" max="80" value="24">
+            <span id="brush-size-label">24</span>
+        </div>
+        <div class="tool-group">
+            <label>Opacity</label>
+            <input type="range" id="brush-opacity" min="20" max="100" value="65">
+            <span id="brush-opacity-label">65%</span>
+        </div>
+    </div>
+
+    <!-- Canvas stack -->
+    <div class="canvas-container" id="canvas-wrap">
+        <canvas id="bg-canvas"></canvas>
+        <canvas id="draw-canvas"></canvas>
+    </div>
+
+    <div class="coverage-hint">
+        Painted coverage: <span id="coverage-pct">0.0</span>% &nbsp;|&nbsp;
+        Minimum required: 0.5%
+    </div>
+
+    <!-- Submit form -->
+    <form method="POST" action="/submit_mask/{{ item.id }}" id="mask-form">
+        <input type="hidden" name="mask_data" id="mask-data-input">
+    </form>
+
+    <div class="action-bar">
+        <button class="btn-submit-mask" id="btn-submit" onclick="submitMask()" disabled>
+            ✓ Submit Mask &amp; Queue Retraining
+        </button>
+        <a href="{{ url_for('review.review_page') }}" class="btn-cancel">✕ Cancel</a>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    /* ── Flame background (reused) ── */
+    const fc = document.getElementById('flame-canvas');
+    if (fc) {
+        const ctx = fc.getContext('2d');
+        const ps = [];
+        function resize() { fc.width = innerWidth; fc.height = innerHeight; }
+        window.addEventListener('resize', resize); resize();
+        for (let i = 0; i < 35; i++) ps.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-.5)*.0006, vy: -(Math.random()*.0005+.0002), sz: Math.random()*2.5+.5, a: Math.random()*.15+.04 });
+        (function draw() { ctx.clearRect(0,0,fc.width,fc.height); for(const p of ps){p.x+=p.vx;p.y+=p.vy;if(p.y<0){p.y=1;p.x=Math.random();}if(p.x<0||p.x>1)p.vx*=-1;ctx.beginPath();ctx.arc(p.x*fc.width,p.y*fc.height,p.sz,0,Math.PI*2);ctx.fillStyle=`rgba(255,107,53,${p.a})`;ctx.fill();} requestAnimationFrame(draw); })();
+    }
+
+    /* ── Canvas setup ── */
+    const bgCanvas   = document.getElementById('bg-canvas');
+    const drawCanvas = document.getElementById('draw-canvas');
+    const bgCtx      = bgCanvas.getContext('2d');
+    const drawCtx    = drawCanvas.getContext('2d');
+
+    const IMG_SRC = "{{ url_for('static', filename=item.img_path) }}";
+    const MAX_W   = Math.min(window.innerWidth - 80, 900);
+    const MAX_H   = Math.min(window.innerHeight - 360, 640);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function () {
+        // Scale to fit within MAX bounds while preserving aspect ratio
+        let w = img.naturalWidth;
+        let h = img.naturalHeight;
+        const scale = Math.min(MAX_W / w, MAX_H / h, 1);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+
+        bgCanvas.width   = drawCanvas.width   = w;
+        bgCanvas.height  = drawCanvas.height  = h;
+        bgCtx.drawImage(img, 0, 0, w, h);
+
+        totalPixels = w * h;
+        updateCoverage();
+    };
+    img.src = IMG_SRC;
+
+    /* ── Tool state ── */
+    let tool          = 'brush';
+    let painting      = false;
+    let lastX         = 0;
+    let lastY         = 0;
+    let totalPixels   = 1;
+
+    window.setTool = function(t) {
+        tool = t;
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + t).classList.add('active');
+        drawCanvas.style.cursor = t === 'eraser' ? 'cell' : 'crosshair';
+    };
+
+    window.clearMask = function() {
+        drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        updateCoverage();
+    };
+
+    /* ── Brush / eraser size & opacity ── */
+    const sizeSlider    = document.getElementById('brush-size');
+    const sizeLabel     = document.getElementById('brush-size-label');
+    const opacSlider    = document.getElementById('brush-opacity');
+    const opacLabel     = document.getElementById('brush-opacity-label');
+
+    sizeSlider.addEventListener('input', function() { sizeLabel.textContent = this.value; });
+    opacSlider.addEventListener('input', function() { opacLabel.textContent = this.value + '%'; });
+
+    function getBrushSize()    { return parseInt(sizeSlider.value, 10); }
+    function getBrushOpacity() { return parseInt(opacSlider.value, 10) / 100; }
+
+    /* ── Draw helpers ── */
+    function getPos(e) {
+        const rect = drawCanvas.getBoundingClientRect();
+        const scaleX = drawCanvas.width  / rect.width;
+        const scaleY = drawCanvas.height / rect.height;
+        const src = e.touches ? e.touches[0] : e;
+        return {
+            x: (src.clientX - rect.left)  * scaleX,
+            y: (src.clientY - rect.top)   * scaleY,
+        };
+    }
+
+    function paint(x, y) {
+        const r = getBrushSize() / 2;
+        drawCtx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
+        drawCtx.fillStyle = `rgba(239, 68, 68, ${getBrushOpacity()})`;  // red mask
+        drawCtx.beginPath();
+        drawCtx.arc(x, y, r, 0, Math.PI * 2);
+        drawCtx.fill();
+
+        // Also draw a line segment between last pos and current for smooth strokes
+        if (painting) {
+            drawCtx.lineWidth   = getBrushSize();
+            drawCtx.strokeStyle = tool === 'eraser'
+                ? 'rgba(0,0,0,1)'
+                : `rgba(239, 68, 68, ${getBrushOpacity()})`;
+            drawCtx.lineCap     = 'round';
+            drawCtx.beginPath();
+            drawCtx.moveTo(lastX, lastY);
+            drawCtx.lineTo(x, y);
+            drawCtx.stroke();
+        }
+    }
+
+    function startPaint(e) { e.preventDefault(); painting = true; const p = getPos(e); lastX = p.x; lastY = p.y; paint(p.x, p.y); }
+    function movePaint(e)  { e.preventDefault(); if (!painting) return; const p = getPos(e); paint(p.x, p.y); lastX = p.x; lastY = p.y; updateCoverage(); }
+    function stopPaint(e)  { e.preventDefault(); painting = false; updateCoverage(); }
+
+    drawCanvas.addEventListener('mousedown',  startPaint);
+    drawCanvas.addEventListener('mousemove',  movePaint);
+    drawCanvas.addEventListener('mouseup',    stopPaint);
+    drawCanvas.addEventListener('mouseleave', stopPaint);
+    drawCanvas.addEventListener('touchstart', startPaint, { passive: false });
+    drawCanvas.addEventListener('touchmove',  movePaint,  { passive: false });
+    drawCanvas.addEventListener('touchend',   stopPaint);
+
+    /* ── Coverage calculation ── */
+    function updateCoverage() {
+        if (!totalPixels) return;
+
+        // Sample the alpha channel — any painted pixel has alpha > 0
+        const data = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height).data;
+        let painted = 0;
+        for (let i = 3; i < data.length; i += 4) {
+            if (data[i] > 10) painted++;
+        }
+        const pct = (painted / totalPixels * 100).toFixed(1);
+        document.getElementById('coverage-pct').textContent = pct;
+
+        const btn = document.getElementById('btn-submit');
+        btn.disabled = parseFloat(pct) < 0.5;
+    }
+
+    /* ── Submit: flatten mask to pure black/white and send as base64 PNG ── */
+    window.submitMask = function() {
+        // Create a binary mask canvas (white = defect, black = normal)
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width  = drawCanvas.width;
+        exportCanvas.height = drawCanvas.height;
+        const ectx = exportCanvas.getContext('2d');
+
+        // Black background
+        ectx.fillStyle = '#000';
+        ectx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+        // Where operator painted (alpha > 0 in draw layer) → white
+        const src = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+        const dst = ectx.createImageData(drawCanvas.width, drawCanvas.height);
+        for (let i = 0; i < src.data.length; i += 4) {
+            const alpha = src.data[i + 3];
+            const val   = alpha > 10 ? 255 : 0;
+            dst.data[i]     = val;
+            dst.data[i + 1] = val;
+            dst.data[i + 2] = val;
+            dst.data[i + 3] = 255;
+        }
+        ectx.putImageData(dst, 0, 0);
+
+        document.getElementById('mask-data-input').value = exportCanvas.toDataURL('image/png');
+        document.getElementById('mask-form').submit();
+    };
+
+})();
+</script>
+</body>
+</html>

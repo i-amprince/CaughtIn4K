@@ -59,6 +59,10 @@ class HumanReview(db.Model):
     is_correct = db.Column(db.Boolean)
     reviewed = db.Column(db.Boolean, default=False)
 
+    # Operator-drawn defect mask (saved as PNG, relative to static/).
+    # Only populated when predicted_label=GOOD and human says DEFECTIVE.
+    mask_path = db.Column(db.String(500), nullable=True)
+
     # Set to True after a successful incremental retrain triggered by this review
     retrained = db.Column(db.Boolean, default=False)
 

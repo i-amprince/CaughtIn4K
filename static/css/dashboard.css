@@ -631,3 +631,12 @@ tbody tr:last-child td {
         flex-direction: column;
     }
 }
+
+/* ── ML job banner animations (used by dashboard.js polling) ── */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+@keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}

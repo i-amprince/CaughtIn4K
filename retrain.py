@@ -343,7 +343,7 @@ def retrain_on_batch(
                 log.info("[Retrain] Staged false-positive image: %s", dest_name)
 
             elif correct_label == "DEFECTIVE" and predicted_label == "GOOD":
-                # False-negative: add to test/correction_defects + generate mask
+                # False-negative: add to test/correction_defects + use operator mask
                 defect_dir = Path(dataset_root) / item_name / "test" / "correction_defects"
                 mask_dir   = Path(dataset_root) / item_name / "ground_truth" / "correction_defects"
                 defect_dir.mkdir(parents=True, exist_ok=True)
@@ -353,8 +353,29 @@ def retrain_on_batch(
                 mask_name  = dest_name.replace(".png", "_mask.png").replace(".jpg", "_mask.png")
                 clean_img  = _strip_heatmap(abs_img_path)
                 cv2.imwrite(str(defect_dir / dest_name), clean_img)
-                h, w = clean_img.shape[:2]
-                cv2.imwrite(str(mask_dir / mask_name), np.ones((h, w), dtype=np.uint8) * 255)
+
+                # Use the operator-drawn mask if it was saved, else fall back to all-ones
+                operator_mask_path = corr.get("mask_path")
+                if operator_mask_path and os.path.exists(operator_mask_path):
+                    drawn_mask = cv2.imread(operator_mask_path, cv2.IMREAD_GRAYSCALE)
+                    if drawn_mask is not None:
+                        # Resize to match the clean image dimensions if needed
+                        h, w = clean_img.shape[:2]
+                        if drawn_mask.shape != (h, w):
+                            drawn_mask = cv2.resize(drawn_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+                        # Binarise: any pixel > 0 → 255
+                        _, binary_mask = cv2.threshold(drawn_mask, 10, 255, cv2.THRESH_BINARY)
+                        cv2.imwrite(str(mask_dir / mask_name), binary_mask)
+                        log.info("[Retrain] Used operator-drawn mask: %s", operator_mask_path)
+                    else:
+                        log.warning("[Retrain] Could not read operator mask %s — falling back to all-ones", operator_mask_path)
+                        h, w = clean_img.shape[:2]
+                        cv2.imwrite(str(mask_dir / mask_name), np.ones((h, w), dtype=np.uint8) * 255)
+                else:
+                    log.warning("[Retrain] No operator mask found for %s — falling back to all-ones", abs_img_path)
+                    h, w = clean_img.shape[:2]
+                    cv2.imwrite(str(mask_dir / mask_name), np.ones((h, w), dtype=np.uint8) * 255)
+
                 log.info("[Retrain] Staged false-negative image: %s", dest_name)
             else:
                 log.warning(

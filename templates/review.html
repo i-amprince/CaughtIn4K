@@ -301,7 +301,7 @@
         }
         .flash-success { background: var(--success-bg); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; }
         .flash-error   { background: var(--error-bg);   border: 1px solid rgba(239,68,68,0.3);  color: #fca5a5; }
-        .flash-warning { background: rgba(255,165,0,0.1); border: 1px solid rgba(255,165,0,0.3); color: #fcd34d; }
+        .flash-warning { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); color: #fcd34d; }
         .flash-retrain { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); color: #93c5fd; }
 
         /* ── Reviewed history ─────────────────────────────────────────────── */
@@ -406,13 +406,19 @@
     </div>
 </header>
 
+<!-- Retrain in-progress banner (server flag + JS polling) -->
+<div id="retrain-banner" class="retrain-banner" style="{{ '' if retrain_in_progress else 'display:none;' }}">
+    <div class="retrain-spinner"></div>
+    <span>Model retraining is running in the background — you can keep reviewing images normally.</span>
+</div>
+
 <!-- Flash messages -->
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}
 <div class="flash-list">
     {% for category, message in messages %}
     <div class="flash-msg flash-{{ category }}">
-        {% if category == 'success' %}✅{% elif category == 'error' %}❌{% elif category == 'retrain' %}🔄{% else %}⚠️{% endif %}
+        {% if category == 'success' %}✅{% elif category == 'error' %}❌{% elif category == 'retrain' %}🔄{% elif category == 'warning' %}⚠️{% else %}ℹ️{% endif %}
         {{ message }}
     </div>
     {% endfor %}
@@ -500,18 +506,20 @@
                     </button>
                 </form>
 
-                <!-- Incorrect form -->
-                <form method="POST" action="/submit_review/{{ item.id }}" class="incorrect-group">
+                <!-- Incorrect group -->
+                <div class="incorrect-group">
                     <input  type="text"
                             name="correct_label"
+                            id="label-{{ item.id }}"
                             class="label-input"
                             placeholder="Correct label (e.g. GOOD)"
-                            autocomplete="off"
-                            required>
-                    <button type="submit" name="is_correct" value="no" class="btn-incorrect">
+                            autocomplete="off">
+                    <button type="button"
+                            class="btn-incorrect"
+                            onclick="handleIncorrect({{ item.id }}, '{{ item.predicted_label }}')">
                         ✗ Incorrect — Retrain
                     </button>
-                </form>
+                </div>
             </div>
         </div>
 
@@ -613,24 +621,58 @@ document.querySelectorAll('.flash-msg').forEach(function(el) {
     }, 6000);
 });
 
-/* ── Confirm before marking incorrect ─── */
-document.querySelectorAll('.btn-incorrect').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-        const form   = btn.closest('form');
-        const input  = form.querySelector('.label-input');
-        const label  = input ? input.value.trim() : '';
-        if (!label) {
-            e.preventDefault();
-            input.focus();
-            input.style.borderColor = 'var(--red)';
-            setTimeout(function() { input.style.borderColor = ''; }, 1500);
-            return;
-        }
-        btn.innerHTML = '<span class="retrain-spinner" style="display:inline-block;"></span> Retraining…';
-        btn.disabled = true;
-        form.closest('.review-card').style.opacity = '0.5';
-    });
-});
+/* ── Incorrect button handler ────────────────────────────────────────────
+ * - If correct label is DEFECTIVE and model said GOOD → false-negative:
+ *   first save the label via a hidden form POST, then the server redirects
+ *   to the mask-drawing page.
+ * - Otherwise (false-positive) → submit the label normally and continue.
+ * ─────────────────────────────────────────────────────────────────────── */
+function handleIncorrect(reviewId, predictedLabel) {
+    var input = document.getElementById('label-' + reviewId);
+    var label = input ? input.value.trim().toUpperCase() : '';
+
+    if (!label) {
+        input.focus();
+        input.style.borderColor = 'var(--red, #ef4444)';
+        setTimeout(function() { input.style.borderColor = ''; }, 1500);
+        return;
+    }
+
+    // Build and submit a form to /submit_review/<id>
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/submit_review/' + reviewId;
+
+    var fLabel = document.createElement('input');
+    fLabel.type = 'hidden'; fLabel.name = 'correct_label'; fLabel.value = label;
+    form.appendChild(fLabel);
+
+    var fCorrect = document.createElement('input');
+    fCorrect.type = 'hidden'; fCorrect.name = 'is_correct'; fCorrect.value = 'no';
+    form.appendChild(fCorrect);
+
+    document.body.appendChild(form);
+    form.submit();
+}
+
+/* ── Poll /retrain_status every 4 s to show/hide the banner ─── */
+(function () {
+    const banner = document.getElementById('retrain-banner');
+    if (!banner) return;
+
+    function poll() {
+        fetch('/retrain_status', { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                banner.style.display = data.in_progress ? 'flex' : 'none';
+            })
+            .catch(function() { /* silently ignore network errors */ });
+    }
+
+    // Start polling only if there's something to watch (banner visible or
+    // the page was just refreshed after a retrain trigger).
+    setInterval(poll, 4000);
+})();
 </script>
 
 </body>

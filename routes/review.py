@@ -1,3 +1,7 @@
+import base64
+import os
+import threading
+
 from flask import Blueprint, current_app, flash, render_template, request, redirect, url_for
 from flask_login import login_required
 
@@ -5,6 +9,10 @@ from models import HumanReview
 from extensions import db
 
 review_bp = Blueprint("review", __name__)
+
+# Global flag so the UI can poll whether retraining is in progress
+_retrain_lock = threading.Lock()
+_retrain_in_progress = False
 
 # ---------------------------------------------------------------------------
 # Retraining threshold
@@ -30,7 +38,16 @@ def review_page():
         reviewed_items=reviewed_items,
         false_classifications_pending=false_classifications_pending,
         retrain_threshold=RETRAIN_THRESHOLD,
+        retrain_in_progress=_retrain_in_progress,
     )
+
+
+@review_bp.route("/retrain_status")
+@login_required
+def retrain_status():
+    """Lightweight JSON endpoint polled by the frontend to track retraining state."""
+    from flask import jsonify
+    return jsonify({"in_progress": _retrain_in_progress})
 
 
 @review_bp.route("/submit_review/<int:review_id>", methods=["POST"])
@@ -38,13 +55,13 @@ def review_page():
 def submit_review(review_id):
     item = HumanReview.query.get_or_404(review_id)
 
-    is_correct = request.form.get("is_correct")
+    is_correct    = request.form.get("is_correct")
     correct_label = request.form.get("correct_label", "").strip().upper()
 
     if is_correct == "yes":
-        item.is_correct = True
+        item.is_correct  = True
         item.human_label = item.predicted_label
-        item.reviewed = True
+        item.reviewed    = True
         db.session.commit()
         flash(f"Review #{review_id} marked as correct.", "success")
 
@@ -53,17 +70,74 @@ def submit_review(review_id):
             flash("Please provide the correct label before submitting.", "error")
             return redirect(url_for("review.review_page"))
 
-        item.is_correct = False
+        item.is_correct  = False
         item.human_label = correct_label
+        # Not committed yet — we may need to collect a mask first
+
+        # False-negative case: model said GOOD but inspector says DEFECTIVE.
+        # Redirect to the mask-drawing page before finalising the review so
+        # the operator can mark exactly where the defect is.
+        if correct_label == "DEFECTIVE" and item.predicted_label.upper() == "GOOD":
+            db.session.commit()   # save human_label + is_correct so draw_mask can read them
+            return redirect(url_for("review.draw_mask", review_id=review_id))
+
+        # False-positive (or other label change): no mask needed, commit and retrain check
         item.reviewed = True
         db.session.commit()
-
-        # Check if we've hit the threshold; trigger batched retraining if so
         _check_and_trigger_batch_retrain()
 
     else:
         flash("Invalid submission.", "error")
 
+    return redirect(url_for("review.review_page"))
+
+
+@review_bp.route("/draw_mask/<int:review_id>", methods=["GET"])
+@login_required
+def draw_mask(review_id):
+    """Show the mask-drawing canvas for a false-negative correction."""
+    item = HumanReview.query.get_or_404(review_id)
+    return render_template("draw_mask.html", item=item)
+
+
+@review_bp.route("/submit_mask/<int:review_id>", methods=["POST"])
+@login_required
+def submit_mask(review_id):
+    """
+    Receive the operator-drawn mask as a base64 PNG, save it to disk,
+    store the path on the HumanReview row, then mark it reviewed and
+    trigger the batch retrain check.
+    """
+    item = HumanReview.query.get_or_404(review_id)
+
+    mask_data = request.form.get("mask_data", "")
+    if not mask_data:
+        flash("No mask received. Please draw the defect area before submitting.", "error")
+        return redirect(url_for("review.draw_mask", review_id=review_id))
+
+    # Decode base64 PNG sent from the canvas
+    try:
+        header, encoded = mask_data.split(",", 1)
+        mask_bytes = base64.b64decode(encoded)
+    except Exception:
+        flash("Invalid mask data. Please try again.", "error")
+        return redirect(url_for("review.draw_mask", review_id=review_id))
+
+    # Save mask PNG into static/masks/
+    masks_dir = os.path.join(current_app.root_path, "static", "masks")
+    os.makedirs(masks_dir, exist_ok=True)
+
+    mask_filename = f"mask_{review_id}.png"
+    mask_abs_path = os.path.join(masks_dir, mask_filename)
+    with open(mask_abs_path, "wb") as f:
+        f.write(mask_bytes)
+
+    item.mask_path = f"masks/{mask_filename}"
+    item.reviewed  = True
+    db.session.commit()
+
+    flash("Mask saved. Correction queued for retraining.", "success")
+    _check_and_trigger_batch_retrain()
     return redirect(url_for("review.review_page"))
 
 
@@ -86,7 +160,7 @@ def _check_and_trigger_batch_retrain():
         flash(
             f"Correction saved. {len(pending_items)}/{RETRAIN_THRESHOLD} false "
             f"classifications collected — retraining will start after {remaining} more.",
-            "info",
+            "warning",  # 'info' has no CSS rule; 'warning' renders correctly
         )
         return
 
@@ -96,8 +170,8 @@ def _check_and_trigger_batch_retrain():
     db.session.commit()
 
     flash(
-        f"Threshold of {RETRAIN_THRESHOLD} false classifications reached. "
-        "Retraining started in the background!",
+        f"🎯 Threshold of {RETRAIN_THRESHOLD} false classifications reached — "
+        "retraining has started in the background. You can keep reviewing!",
         "retrain",
     )
 
@@ -109,8 +183,10 @@ def _launch_retrain_thread(items):
     Spawn a daemon thread so retraining never blocks the HTTP response.
     We snapshot everything we need from the app context here, before
     the thread starts, so there are no SQLAlchemy/session issues.
+    Sets the module-level _retrain_in_progress flag so the UI can poll
+    the /retrain_status endpoint to show a live banner.
     """
-    import threading
+    global _retrain_in_progress
 
     app = current_app._get_current_object()
 
@@ -121,6 +197,11 @@ def _launch_retrain_thread(items):
             "correct_label":   item.human_label,
             "predicted_label": item.predicted_label,
             "item_name":       getattr(item, "item_name", None) or _infer_item_name(item.img_path),
+            # Absolute path to the operator-drawn mask PNG (None for false-positives)
+            "mask_path": (
+                os.path.join(current_app.root_path, "static", item.mask_path)
+                if item.mask_path else None
+            ),
         }
         for item in items
     ]
@@ -129,6 +210,10 @@ def _launch_retrain_thread(items):
     dataset_root    = app.config.get("DATASET_ROOT", "")
 
     def _run():
+        global _retrain_in_progress
+        with _retrain_lock:
+            _retrain_in_progress = True
+
         with app.app_context():
             print(
                 f"[Retrain] Retraining started because threshold reached "
@@ -165,6 +250,11 @@ def _launch_retrain_thread(items):
 
             except Exception as exc:
                 print(f"[Retrain] Retraining failed with exception: {exc}", flush=True)
+
+            finally:
+                with _retrain_lock:
+                    _retrain_in_progress = False
+                print("[Retrain] Background thread finished. UI flag cleared.", flush=True)
 
     thread = threading.Thread(target=_run, daemon=True, name="retrain-worker")
     thread.start()
