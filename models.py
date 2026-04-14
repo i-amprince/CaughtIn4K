@@ -49,6 +49,10 @@ class HumanReview(db.Model):
     img_path = db.Column(db.String(500), nullable=False)
     img_name = db.Column(db.String(255))   # ⭐ NEW
 
+    # Link back to the inspection run that generated this review item
+    inspection_run_id = db.Column(db.Integer, db.ForeignKey("inspection_run.id"), nullable=True)
+    inspection_run = db.relationship("InspectionRun", backref=db.backref("review_items", lazy=True))
+
     predicted_label = db.Column(db.String(50), nullable=False)
     confidence = db.Column(db.Float, nullable=False)
 

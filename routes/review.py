@@ -32,10 +32,32 @@ def review_page():
         reviewed=True, is_correct=False, retrained=False
     ).count()
 
+    # Group pending items by inspection run so the UI can show one section per run.
+    # Items that pre-date the inspection_run_id column (legacy) are grouped under None.
+    from collections import OrderedDict
+    from models import InspectionRun
+
+    runs_map = OrderedDict()   # {InspectionRun | None: [HumanReview, ...]}
+    for item in items:
+        run = item.inspection_run  # relationship; None for legacy rows
+        if run not in runs_map:
+            runs_map[run] = []
+        runs_map[run].append(item)
+
+    # Similarly group reviewed history
+    reviewed_runs_map = OrderedDict()
+    for item in reviewed_items:
+        run = item.inspection_run
+        if run not in reviewed_runs_map:
+            reviewed_runs_map[run] = []
+        reviewed_runs_map[run].append(item)
+
     return render_template(
         "review.html",
         items=items,
+        runs_map=runs_map,
         reviewed_items=reviewed_items,
+        reviewed_runs_map=reviewed_runs_map,
         false_classifications_pending=false_classifications_pending,
         retrain_threshold=RETRAIN_THRESHOLD,
         retrain_in_progress=_retrain_in_progress,

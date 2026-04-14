@@ -39,7 +39,7 @@ def _build_localized_heatmap(anomaly_map, pred_mask, image_shape):
     return cv2.applyColorMap((normalized * 255).astype(np.uint8), cv2.COLORMAP_JET)
 
 
-def run_inferencer_batch(deployment_model_path, test_folder_root, output_dir):
+def run_inferencer_batch(deployment_model_path, test_folder_root, output_dir, inspection_run_id=None, item_name=None):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     inferencer = TorchInferencer(path=deployment_model_path, device=device)
 
@@ -84,8 +84,9 @@ def run_inferencer_batch(deployment_model_path, test_folder_root, output_dir):
         # 🔥 STORE EVERY IMAGE FOR REVIEW
         review_entry = HumanReview(
             img_path=f"results/{out_name}",
-            # ⭐ ADD THIS LINE (VERY IMPORTANT)
             img_name=os.path.basename(img_path),
+            inspection_run_id=inspection_run_id,
+            item_name=item_name or defect_category,
             predicted_label=predicted_label,
             confidence=score,
             human_label=None,

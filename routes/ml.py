@@ -167,21 +167,36 @@ def run_inspection():
         with app.app_context():
             try:
                 from run_model import run_inferencer_batch
-                results_data, summary = run_inferencer_batch(model_path, test_folder, output_dir)
 
+                # Create the InspectionRun record first so we have its ID
+                # to link HumanReview items back to this run.
                 inspection_run = InspectionRun(
                     item_name=item_name,
                     test_folder=test_folder,
-                    total_images=summary["total"],
-                    defective_count=sum(1 for r in results_data if "DEFECTIVE" in r["status"]),
-                    good_count=sum(1 for r in results_data if "GOOD" in r["status"]),
-                    avg_latency=summary["avg_latency"],
-                    fps=summary["fps"],
-                    total_time_sec=summary["total_time_sec"],
+                    total_images=0,
+                    defective_count=0,
+                    good_count=0,
+                    avg_latency=0.0,
+                    fps=0.0,
+                    total_time_sec=0.0,
                     operator_id=user_id,
                 )
                 db.session.add(inspection_run)
-                db.session.flush()
+                db.session.flush()  # get inspection_run.id before running inference
+
+                results_data, summary = run_inferencer_batch(
+                    model_path, test_folder, output_dir,
+                    inspection_run_id=inspection_run.id,
+                    item_name=item_name,
+                )
+
+                # Update the run with real summary values
+                inspection_run.total_images   = summary["total"]
+                inspection_run.defective_count = sum(1 for r in results_data if "DEFECTIVE" in r["status"])
+                inspection_run.good_count      = sum(1 for r in results_data if "GOOD"      in r["status"])
+                inspection_run.avg_latency     = summary["avg_latency"]
+                inspection_run.fps             = summary["fps"]
+                inspection_run.total_time_sec  = summary["total_time_sec"]
 
                 for result in results_data:
                     db.session.add(InspectionImageResult(

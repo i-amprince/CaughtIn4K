@@ -356,6 +356,102 @@
         }
         .history-correction strong { color: var(--accent); }
 
+        /* ── Run section accordion ──────────────────────────────────────────── */
+        .run-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 40px;
+            margin: 0 0 2px;
+            background: rgba(255,107,53,0.06);
+            border-top: 1px solid rgba(255,107,53,0.18);
+            border-bottom: 1px solid rgba(255,107,53,0.18);
+            cursor: pointer;
+            position: relative;
+            z-index: 2;
+            transition: background 0.2s;
+            user-select: none;
+        }
+        .run-section-header:hover { background: rgba(255,107,53,0.1); }
+        .run-section-header--reviewed {
+            background: rgba(255,255,255,0.03);
+            border-color: var(--border);
+        }
+        .run-section-header--reviewed:hover { background: rgba(255,255,255,0.06); }
+
+        .run-section-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+            flex: 1;
+        }
+        .run-chevron {
+            font-size: 0.7rem;
+            color: var(--orange);
+            transition: transform 0.25s ease;
+            flex-shrink: 0;
+        }
+        .run-chevron.collapsed { transform: rotate(-90deg); }
+
+        .run-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        .run-item-tag {
+            background: rgba(255,107,53,0.15);
+            border: 1px solid rgba(255,107,53,0.35);
+            color: var(--orange);
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
+            letter-spacing: 0.06em;
+        }
+        .run-meta {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .run-count-badge {
+            background: var(--orange);
+            color: #000;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-left: 16px;
+        }
+        .run-count-badge--reviewed {
+            background: rgba(16,185,129,0.2);
+            border: 1px solid rgba(16,185,129,0.4);
+            color: #6ee7b7;
+        }
+
+        .run-section-body {
+            overflow: hidden;
+            transition: max-height 0.35s ease, opacity 0.3s ease;
+            max-height: 4000px; /* large enough for any run */
+            opacity: 1;
+        }
+        .run-section-body.collapsed {
+            max-height: 0;
+            opacity: 0;
+        }
+
+        .history-grid {
+            padding-top: 0;
+        }
+
         /* ── Retrain indicator ─────────────────────────────────────────────── */
         .retrain-banner {
             margin: 0 40px 24px;
@@ -444,7 +540,7 @@
     </div>
 </div>
 
-<!-- Pending reviews -->
+<!-- Pending reviews — grouped by inspection run -->
 <div class="section-heading">
     <h2>
         Pending Reviews
@@ -460,114 +556,178 @@
     <p>No pending reviews right now. New items will appear here after each inspection run.</p>
 </div>
 {% else %}
-<div class="review-grid">
-    {% for item in items %}
-    <div class="review-card" style="animation-delay: {{ loop.index0 * 0.06 }}s">
+    {% set run_loop_idx = namespace(value=0) %}
+    {% for run, run_items in runs_map.items() %}
+    {% set run_loop_idx.value = run_loop_idx.value + 1 %}
+    {% set section_id = "run-section-" ~ run_loop_idx.value %}
 
-        <div class="card-image-wrap">
-            <img src="{{ url_for('static', filename=item.img_path) }}"
-                 alt="Inspection image {{ item.id }}"
-                 loading="lazy">
-            <span class="card-badge {% if 'DEFECTIVE' in item.predicted_label %}badge-defective{% else %}badge-good{% endif %}">
-                {{ item.predicted_label }}
-            </span>
+    <!-- Run header / accordion toggle -->
+    <div class="run-section-header" onclick="toggleRunSection('{{ section_id }}', this)">
+        <div class="run-section-left">
+            <span class="run-chevron">▼</span>
+            {% if run %}
+                <span class="run-title">
+                    Run #{{ run.id }}
+                    {% if run.item_name %}<span class="run-item-tag">{{ run.item_name | upper }}</span>{% endif %}
+                </span>
+                <span class="run-meta">
+                    {{ run.created_at.strftime('%d %b %Y, %H:%M') if run.created_at else '' }}
+                    &nbsp;·&nbsp; {{ run.total_images }} image{{ 's' if run.total_images != 1 else '' }}
+                    &nbsp;·&nbsp; {{ run.defective_count }} defective
+                </span>
+            {% else %}
+                <span class="run-title">Unlinked Reviews</span>
+                <span class="run-meta">Items from before run-tracking was enabled</span>
+            {% endif %}
         </div>
+        <span class="run-count-badge">{{ run_items | length }} pending</span>
+    </div>
 
-        <div class="card-body">
-            <div class="card-meta">
-                <div class="card-meta-left">
-                    <div class="img-name">{{ item.img_path | replace('results/', '') }}</div>
-                    <div class="prediction-label">Predicted: {{ item.predicted_label }}</div>
-                </div>
-                <div class="confidence-pill">
-                    Score: <span>{{ "%.3f" | format(item.confidence) }}</span>
-                </div>
-            </div>
+    <div id="{{ section_id }}" class="run-section-body">
+        <div class="review-grid" style="padding-top: 0;">
+            {% for item in run_items %}
+            <div class="review-card" style="animation-delay: {{ loop.index0 * 0.06 }}s">
 
-            <!-- Confidence bar -->
-            <div class="conf-bar-wrap">
-                <div class="conf-bar-label">
-                    <span>Anomaly score</span>
-                    <span>{{ "%.1f" | format(item.confidence * 100) }}%</span>
+                <div class="card-image-wrap">
+                    <img src="{{ url_for('static', filename=item.img_path) }}"
+                         alt="Inspection image {{ item.id }}"
+                         loading="lazy">
+                    <span class="card-badge {% if 'DEFECTIVE' in item.predicted_label %}badge-defective{% else %}badge-good{% endif %}">
+                        {{ item.predicted_label }}
+                    </span>
                 </div>
-                <div class="conf-bar-track">
-                    <div class="conf-bar-fill {% if 'DEFECTIVE' in item.predicted_label %}fill-defective{% else %}fill-good{% endif %}"
-                         style="width: {{ [item.confidence * 100, 100] | min }}%">
+
+                <div class="card-body">
+                    <div class="card-meta">
+                        <div class="card-meta-left">
+                            <div class="img-name">{{ item.img_path | replace('results/', '') }}</div>
+                            <div class="prediction-label">Predicted: {{ item.predicted_label }}</div>
+                        </div>
+                        <div class="confidence-pill">
+                            Score: <span>{{ "%.3f" | format(item.confidence) }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Confidence bar -->
+                    <div class="conf-bar-wrap">
+                        <div class="conf-bar-label">
+                            <span>Anomaly score</span>
+                            <span>{{ "%.1f" | format(item.confidence * 100) }}%</span>
+                        </div>
+                        <div class="conf-bar-track">
+                            <div class="conf-bar-fill {% if 'DEFECTIVE' in item.predicted_label %}fill-defective{% else %}fill-good{% endif %}"
+                                 style="width: {{ [item.confidence * 100, 100] | min }}%">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action row -->
+                    <div class="action-row">
+                        <!-- Correct button -->
+                        <form method="POST" action="/submit_review/{{ item.id }}" style="flex:1; display:flex;">
+                            <button type="submit" name="is_correct" value="yes" class="btn-correct">
+                                ✓ Correct
+                            </button>
+                        </form>
+
+                        <!-- Incorrect group -->
+                        <div class="incorrect-group">
+                            <input  type="text"
+                                    name="correct_label"
+                                    id="label-{{ item.id }}"
+                                    class="label-input"
+                                    placeholder="Correct label (e.g. GOOD)"
+                                    autocomplete="off">
+                            <button type="button"
+                                    class="btn-incorrect"
+                                    onclick="handleIncorrect({{ item.id }}, '{{ item.predicted_label }}')">
+                                ✗ Incorrect — Retrain
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Action row -->
-            <div class="action-row">
-                <!-- Correct button -->
-                <form method="POST" action="/submit_review/{{ item.id }}" style="flex:1; display:flex;">
-                    <button type="submit" name="is_correct" value="yes" class="btn-correct">
-                        ✓ Correct
-                    </button>
-                </form>
-
-                <!-- Incorrect group -->
-                <div class="incorrect-group">
-                    <input  type="text"
-                            name="correct_label"
-                            id="label-{{ item.id }}"
-                            class="label-input"
-                            placeholder="Correct label (e.g. GOOD)"
-                            autocomplete="off">
-                    <button type="button"
-                            class="btn-incorrect"
-                            onclick="handleIncorrect({{ item.id }}, '{{ item.predicted_label }}')">
-                        ✗ Incorrect — Retrain
-                    </button>
-                </div>
             </div>
+            {% endfor %}
         </div>
-
     </div>
     {% endfor %}
-</div>
 {% endif %}
 
-<!-- Reviewed history -->
+<!-- Reviewed history — grouped by inspection run -->
 {% if reviewed_items %}
 <div class="section-heading" style="padding-top: 16px;">
     <h2>Recently Reviewed</h2>
 </div>
 <div class="divider"></div>
-<div class="history-grid">
-    {% for item in reviewed_items %}
-    <div class="history-card">
-        <div class="history-image-wrap">
-            <img src="{{ url_for('static', filename=item.img_path) }}"
-                 alt="Reviewed image"
-                 loading="lazy">
-        </div>
-        <div class="history-body">
-            <div class="history-row">
-                <span class="label">Prediction</span>
-                <span>{{ item.predicted_label }}</span>
+
+{% set rev_loop_idx = namespace(value=0) %}
+{% for run, run_items in reviewed_runs_map.items() %}
+{% set rev_loop_idx.value = rev_loop_idx.value + 1 %}
+{% set hist_id = "hist-section-" ~ rev_loop_idx.value %}
+
+<div class="run-section-header run-section-header--reviewed" onclick="toggleRunSection('{{ hist_id }}', this)">
+    <div class="run-section-left">
+        <span class="run-chevron">▼</span>
+        {% if run %}
+            <span class="run-title">
+                Run #{{ run.id }}
+                {% if run.item_name %}<span class="run-item-tag">{{ run.item_name | upper }}</span>{% endif %}
+            </span>
+            <span class="run-meta">{{ run.created_at.strftime('%d %b %Y, %H:%M') if run.created_at else '' }}</span>
+        {% else %}
+            <span class="run-title">Unlinked Reviews</span>
+        {% endif %}
+    </div>
+    <span class="run-count-badge run-count-badge--reviewed">{{ run_items | length }} reviewed</span>
+</div>
+
+<div id="{{ hist_id }}" class="run-section-body">
+    <div class="history-grid">
+        {% for item in run_items %}
+        <div class="history-card">
+            <div class="history-image-wrap">
+                <img src="{{ url_for('static', filename=item.img_path) }}"
+                     alt="Reviewed image"
+                     loading="lazy">
             </div>
-            <div class="history-row">
-                <span class="label">Outcome</span>
-                {% if item.is_correct %}
-                <span class="outcome-correct">✓ Correct</span>
-                {% else %}
-                <span class="outcome-incorrect">✗ Incorrect</span>
+            <div class="history-body">
+                <div class="history-row">
+                    <span class="label">Prediction</span>
+                    <span>{{ item.predicted_label }}</span>
+                </div>
+                <div class="history-row">
+                    <span class="label">Outcome</span>
+                    {% if item.is_correct %}
+                    <span class="outcome-correct">✓ Correct</span>
+                    {% else %}
+                    <span class="outcome-incorrect">✗ Incorrect</span>
+                    {% endif %}
+                </div>
+                {% if not item.is_correct and item.human_label %}
+                <div class="history-correction">
+                    Corrected to: <strong>{{ item.human_label }}</strong>
+                    — model retrained
+                </div>
                 {% endif %}
             </div>
-            {% if not item.is_correct and item.human_label %}
-            <div class="history-correction">
-                Corrected to: <strong>{{ item.human_label }}</strong>
-                — model retrained
-            </div>
-            {% endif %}
         </div>
+        {% endfor %}
     </div>
-    {% endfor %}
 </div>
+{% endfor %}
 {% endif %}
 
 <script>
+/* ── Run section accordion ─── */
+function toggleRunSection(sectionId, headerEl) {
+    var body    = document.getElementById(sectionId);
+    var chevron = headerEl.querySelector('.run-chevron');
+    if (!body) return;
+    var isCollapsed = body.classList.toggle('collapsed');
+    if (chevron) chevron.classList.toggle('collapsed', isCollapsed);
+}
+
 /* ── Flame canvas (reuse from dashboard.js style) ─── */
 (function () {
     const canvas = document.getElementById('flame-canvas');
