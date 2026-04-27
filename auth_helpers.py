@@ -30,12 +30,14 @@ def upsert_google_user(email: str, role: str) -> tuple[User, bool]:
     if existing_user:
         existing_user.role = role
         existing_user.password = GOOGLE_OAUTH_PASSWORD_PLACEHOLDER
+        existing_user.access_revoked = False
         return existing_user, False
 
     user = User(
         username=normalized_email,
         password=GOOGLE_OAUTH_PASSWORD_PLACEHOLDER,
         role=role,
+        access_revoked=False,
     )
     db.session.add(user)
     return user, True

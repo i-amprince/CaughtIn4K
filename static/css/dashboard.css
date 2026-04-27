@@ -397,6 +397,22 @@ tbody tr:last-child td {
     border: 1px solid rgba(66, 165, 245, 0.3);
 }
 
+.badge-active {
+    background: rgba(16, 185, 129, 0.14);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-revoked {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+tr.is-revoked td {
+    opacity: 0.72;
+}
+
 .start-btn {
     background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     color: #ffffff;
@@ -466,6 +482,109 @@ tbody tr:last-child td {
     font-size: 0.8em;
     color: var(--text-muted);
     text-transform: uppercase;
+}
+
+.admin-stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.admin-split-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
+}
+
+.admin-panel {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 18px;
+}
+
+.admin-panel h4 {
+    margin-bottom: 14px;
+    color: var(--text);
+    font-size: 1em;
+}
+
+.metric-list {
+    display: grid;
+    gap: 10px;
+}
+
+.metric-list div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    color: var(--text-muted);
+    font-size: 0.92em;
+}
+
+.metric-list strong {
+    color: var(--text);
+    font-weight: 700;
+}
+
+.result-good {
+    color: var(--operator-badge);
+    font-weight: 600;
+}
+
+.result-defective {
+    color: var(--error);
+    font-weight: 600;
+}
+
+.result-separator {
+    color: var(--text-muted);
+    margin: 0 6px;
+}
+
+.role-update-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.role-update-form select {
+    min-width: 210px;
+}
+
+.mini-btn {
+    background: rgba(59, 130, 246, 0.18);
+    color: #bfdbfe;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-family: "Outfit", sans-serif;
+    transition: all 0.2s ease;
+}
+
+.mini-btn:hover {
+    background: rgba(59, 130, 246, 0.28);
+    transform: translateY(-1px);
+}
+
+.mini-btn-danger {
+    background: rgba(239, 68, 68, 0.14);
+    color: #fecaca;
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
+.mini-btn-danger:hover {
+    background: rgba(239, 68, 68, 0.24);
+}
+
+.mini-btn-success {
+    background: rgba(16, 185, 129, 0.14);
+    color: #bbf7d0;
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+.mini-btn-success:hover {
+    background: rgba(16, 185, 129, 0.24);
 }
 
 .section-header {

@@ -593,9 +593,9 @@ const FLOWS = [
     id: 'flow3',
     actors: ['user','flask','rds','ml','s3'],
     steps: [
-      { from:0, to:1, dir:'r', label:'POST /feedback (correction)',color:'#ff5252' },
-      { from:1, to:2, dir:'r', label:'store label in RDS',        color:'#b388ff' },
-      { from:1, to:3, dir:'r', label:'trigger continual learning',color:'#b388ff' },
+      { from:0, to:1, dir:'r', label:'POST /submit_review/<id>',  color:'#ff5252' },
+      { from:1, to:2, dir:'r', label:'store review decision',     color:'#b388ff' },
+      { from:1, to:3, dir:'r', label:'trigger retraining check',  color:'#b388ff' },
       { from:3, to:4, dir:'r', label:'save updated weights → S3', color:'#ff6b9d' },
       { from:3, to:1, dir:'l', label:'learning complete',         color:'#ff6b9d' },
       { from:1, to:0, dir:'l', label:'200 OK — feedback saved',   color:'#b388ff' },
@@ -757,7 +757,7 @@ const interactions = [
   { from:'flask', fromLabel:'🐍 Flask API',     to:'rds',   toLabel:'🐘 AWS RDS',      method:'SQLAlchemy ORM over TCP',  dir:'⇄' },
   { from:'flask', fromLabel:'🐍 Flask API',     to:'s3',    toLabel:'🪣 AWS S3',       method:'boto3 SDK (HTTPS)',         dir:'⇄' },
   { from:'ml',    fromLabel:'🧠 ML Engine',     to:'s3',    toLabel:'🪣 AWS S3',       method:'boto3 SDK — save weights', dir:'→' },
-  { from:'user',  fromLabel:'🧑 Human Feedback',to:'flask', toLabel:'🐍 Flask API',    method:'HTTPS POST /feedback',     dir:'→' },
+  { from:'user',  fromLabel:'🧑 Human Feedback',to:'flask', toLabel:'🐍 Flask API',    method:'HTTPS POST /submit_review/<id>', dir:'→' },
   { from:'flask', fromLabel:'🐍 Flask API',     to:'ml',    toLabel:'🧠 ML Engine',    method:'Trigger continual learn',  dir:'→' },
 ];
 

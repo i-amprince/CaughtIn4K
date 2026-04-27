@@ -125,7 +125,20 @@ Industrial Camera / Image Upload
   * Adapting to new defect types
 * No full retraining required
 
-➡️ *System improves continuously over time*
+---
+
+### 5. Admin Operations and Access Control
+
+* System administrators can:
+
+  * Authorize Google accounts
+  * Assign and change roles
+  * Revoke or restore account access without deleting historical records
+  * View system-wide inspection and review metrics
+
+* The admin dashboard shows active users, role counts, revoked accounts, recent inspection activity, pending reviews, review accuracy, and corrections awaiting retraining.
+
+This gives the administrator section real operational purpose beyond initial user creation.
 
 ---
 
@@ -140,6 +153,8 @@ Industrial Camera / Image Upload
 | Explainability       | Grad-CAM / Heatmaps      |
 | Deployment           | Windows / Linux          |
 | Hardware Support     | CPU / GPU / Edge Devices |
+
+Current implementation note: the active Flask codebase uses anomalib PatchCore with Torch export/inference, Flask-SQLAlchemy, Flask-Login, and Google OAuth based account authorization.
 
 ---
 

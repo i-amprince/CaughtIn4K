@@ -21,6 +21,8 @@ In **CaughtIn4K**, direct manipulation occurs through the following interactions
 - Viewing prediction results directly on the screen
 - Visualizing **Grad-CAM heatmaps** highlighting defect regions
 - Providing feedback on model predictions
+- Drawing masks for missed defects
+- Managing users and roles through admin dashboard controls
 
 These actions are performed using graphical controls such as buttons, upload boxes, and result displays, allowing users to interact naturally with the system.
 
@@ -48,7 +50,7 @@ We selected a **Direct Manipulation Interface** for the following reasons:
 4. **Immediate Feedback**
 
    Direct manipulation interfaces provide immediate system responses when users perform actions.  
-   When an image is uploaded in CaughtIn4K, the system quickly processes it and displays the prediction result and heatmap.
+   When an inspection is run in CaughtIn4K, the system processes the selected test folder and displays prediction results, heatmaps, review status, and dashboard metrics.
 
 5. **Web-Based Accessibility**
 

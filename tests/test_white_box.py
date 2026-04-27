@@ -8,7 +8,7 @@ from routes.auth import _is_verified_google_email
 from training import _validate_mvtec_item_structure
 
 from extensions import db
-from models import HumanReview
+from models import HumanReview, User
 from tests.test_support import AQITestCase
 
 
@@ -22,6 +22,29 @@ class WhiteBoxTests(AQITestCase):
         self.assertTrue(_is_verified_google_email({"email_verified": True}))
         self.assertTrue(_is_verified_google_email({"email_verified": "true"}))
         self.assertFalse(_is_verified_google_email({"email_verified": "false"}))
+
+    def test_revoked_google_account_is_denied_login(self):
+        user = self.create_user("revoked@example.com", "Quality Operator")
+        with self.app.app_context():
+            revoked = db.session.get(User, user.id)
+            revoked.access_revoked = True
+            db.session.commit()
+
+        with self.client.session_transaction() as session:
+            session["google_oauth_state"] = "state-token"
+
+        with patch("routes.auth._exchange_google_code_for_tokens", return_value={"access_token": "token"}):
+            with patch(
+                "routes.auth._fetch_google_user_info",
+                return_value={"email": "revoked@example.com", "email_verified": True},
+            ):
+                response = self.client.get("/auth/google/callback?state=state-token&code=code")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.headers["Location"])
+        with self.client.session_transaction() as session:
+            flashes = session.get("_flashes", [])
+        self.assertTrue(any("revoked" in message for _, message in flashes))
 
     def test_resolve_model_path_prefers_primary_then_legacy(self):
         model_path = Path(self.app.config["MODEL_OUTPUT_DIR"]) / "bottle" / "weights" / "torch"

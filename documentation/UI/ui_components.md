@@ -41,17 +41,26 @@ The UI displays:
 
 ---
 
-## Step 4 — Human Feedback (to be implemented)
+## Step 4 - Human Review Feedback
 
-The inspector can confirm or correct the prediction using the **Submit Feedback** button.
+The Quality Operator reviews inspection predictions through the review panel.
 
 The browser sends the feedback request:
 
 ```
-POST /feedback
+POST /submit_review/<review_id>
 ```
 
-The corrected label is stored in the database and later used for **continual model learning**.
+If the prediction is correct, the operator clicks **Correct**.
+If the prediction is wrong, the operator enters the true label (`GOOD` or `DEFECTIVE`) and clicks **Incorrect - Retrain**.
+When the model predicts `GOOD` but the actual product is `DEFECTIVE`, the operator is redirected to the mask drawing page:
+
+```
+GET /draw_mask/<review_id>
+POST /submit_mask/<review_id>
+```
+
+The corrected label and optional mask path are stored in the database and later used for continual model learning.
 
 ---
 
@@ -69,6 +78,24 @@ The backend retrieves the inspection data from the database and displays it in t
 
 ---
 
+## Step 6 - Administrator Dashboard
+
+System Administrators use the dashboard to manage access and monitor system activity.
+
+The admin dashboard shows:
+
+* Active user count
+* Role breakdown
+* Revoked account count
+* Recent inspection activity
+* Pending review count
+* Review accuracy
+* Corrections waiting for retraining
+
+Admins can also change user roles, revoke account access, and restore account access without deleting historical inspection records.
+
+---
+
 # 4. Interaction Summary
 
 Through this UI implementation, users can perform the following actions:
@@ -78,6 +105,7 @@ Through this UI implementation, users can perform the following actions:
 * View model predictions and heatmaps
 * Provide feedback to improve the model
 * Review historical inspection results
+* Manage user roles and account access as an administrator
 
 The user interface provides a simple and intuitive way for inspectors to interact with the **CaughtIn4K defect detection system** while the backend services handle machine learning inference and data storage.
 

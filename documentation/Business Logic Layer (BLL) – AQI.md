@@ -29,13 +29,13 @@ The AQI (Automated Quality Inspection) system follows a layered architecture whe
 ### 2. Human Review Module (Human-in-the-Loop)
 
 * **Description:**
-  This module allows a Quality Operator to validate model predictions. The operator can mark predictions as correct or incorrect and provide corrected labels if necessary.
+  This module allows a Quality Operator to validate model predictions. The operator can mark predictions as correct or incorrect and provide corrected labels if necessary. In the current implementation, the supported review labels are `GOOD` and `DEFECTIVE`.
 
 * **Implementation:**
   Implemented in `routes/review.py` through the `submit_review()` function.
 
 * **Interaction with Presentation Layer:**
-  Accessible via the `/review` page. Users interact through form inputs and buttons to submit their evaluation.
+  Accessible via the `/review` page. Users interact through form inputs and buttons to submit their evaluation. Review items are grouped by inspection run so operators can process one run at a time.
 
 * **Example:**
 
@@ -47,6 +47,8 @@ The AQI (Automated Quality Inspection) system follows a layered architecture whe
     is_correct = False
     human_label = GOOD
     ```
+
+  If the model predicts `GOOD` but the product is actually defective, the operator enters `DEFECTIVE`; the system then redirects to the mask drawing page so the missed defect region can be captured.
 
 ---
 
@@ -73,16 +75,17 @@ The AQI (Automated Quality Inspection) system follows a layered architecture whe
 ### 4. User and Role Management Module
 
 * **Description:**
-  Handles authentication and authorization, ensuring that users can only access functionalities permitted by their roles.
+  Handles authentication and authorization, ensuring that users can only access functionalities permitted by their roles. The administrator can authorize Google accounts, change roles, revoke access, and restore access.
 
 * **Implementation:**
-  Defined in `models.py` and managed using Flask-Login.
+  Defined in `models.py`, `routes/admin.py`, `routes/auth.py`, and managed using Flask-Login.
 
 * **Interaction with Presentation Layer:**
-  Login interface determines user access and redirects to appropriate dashboard views.
+  Login interface determines user access and redirects to appropriate dashboard views. The administrator dashboard also displays active users, role breakdown, revoked accounts, recent inspection activity, and review queue metrics.
 
 * **Example:**
   Only users with the role *Quality Operator* can access the review panel.
+  If a user's `access_revoked` flag is set, Google OAuth login is blocked even if the email exists in the database.
 
 ---
 
@@ -120,6 +123,8 @@ Business rules define how the system processes data and enforces constraints.
 ### 1. Role-Based Access Control
 
 * Only authorized users can perform specific actions.
+* Administrators can create users, change roles, revoke access, and restore access.
+* The system prevents revoking the current administrator's own account and prevents removing the last active System Administrator.
 * Example:
 
   ```python
@@ -145,6 +150,13 @@ Business rules define how the system processes data and enforces constraints.
     is_correct = False
     human_label = user-provided label
     ```
+
+* For current project usage:
+
+  ```text
+  Predicted GOOD but actual defective -> enter DEFECTIVE, then draw mask
+  Predicted DEFECTIVE but actual good -> enter GOOD, no mask required
+  ```
 
 ---
 
@@ -177,6 +189,9 @@ Business rules define how the system processes data and enforces constraints.
   ```python
   HumanReview.query.filter_by(reviewed=False)
   ```
+
+* Pending and recently reviewed records are grouped by `inspection_run_id`.
+* Legacy records without a run link are shown as unlinked reviews.
 
 ---
 
@@ -219,6 +234,13 @@ Validation ensures that only correct and meaningful data enters the system.
 
   ```python
   @login_required
+  ```
+
+* Ensures revoked accounts cannot complete Google OAuth login:
+
+  ```python
+  if user.access_revoked:
+      redirect(url_for("auth.login"))
   ```
 
 ---
@@ -283,6 +305,8 @@ Data transformation ensures compatibility between the data layer and presentatio
   ```
   Accuracy = (Correct / Reviewed) × 100
   ```
+
+* The administrator dashboard transforms stored data into summary metrics such as active users, role counts, revoked accounts, inspection totals, pending reviews, review accuracy, and corrections awaiting retraining.
 
 ---
 

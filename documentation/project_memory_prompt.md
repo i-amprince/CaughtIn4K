@@ -37,6 +37,9 @@ Important note about documentation vs code:
 Core user roles:
 - System Administrator
   - can authorize/create users and assign roles
+  - can view system-wide admin overview metrics
+  - can change user roles
+  - can revoke and restore user access without deleting historical records
 - Manufacturing Engineer
   - can start training for an item/model
 - Quality Operator
@@ -80,6 +83,7 @@ Key Flask files and responsibilities:
   - defines User, InspectionRun, InspectionImageResult, HumanReview
 - bootstrap.py
   - creates initial DB tables and bootstrap admin users
+  - performs small schema compatibility checks for local SQLite columns such as User.access_revoked
 - auth_helpers.py
   - email normalization/validation and Google-user creation/update helpers
 
@@ -87,11 +91,16 @@ Main route modules:
 - routes/auth.py
   - login flow
   - Google OAuth support
+  - blocks login for revoked accounts
   - logout
 - routes/admin.py
   - create/authorize users with roles
+  - update user roles
+  - revoke and restore user access
 - routes/dashboard.py
   - main dashboard
+  - admin system overview
+  - recent inspection activity for administrators
   - recent history for operators
   - history detail page with review mapping
 - routes/ml.py
@@ -114,6 +123,7 @@ Database model details:
   - username
   - password
   - role
+  - access_revoked
 
 - InspectionRun
   - one row per inspection batch/run
@@ -125,7 +135,7 @@ Database model details:
 
 - HumanReview
   - one row per image available for human review
-  - stores img_path, img_name, predicted_label, confidence, item_name, human_label, is_correct, reviewed, mask_path, retrained
+  - stores img_path, img_name, inspection_run_id, predicted_label, confidence, item_name, human_label, is_correct, reviewed, mask_path, retrained
 
 How data is stored:
 - SQLite DB URI in app.py:
@@ -200,7 +210,8 @@ How inspection/inference works:
 - Progress is checked by /inspection_status
 
 Human review workflow:
-- Review page shows unreviewed and recently reviewed items
+- Review page shows unreviewed and recently reviewed items grouped by inspection run
+- Legacy review rows without inspection_run_id are shown under an unlinked reviews section
 - If operator marks prediction as correct:
   - is_correct = True
   - human_label = predicted_label
@@ -208,6 +219,13 @@ Human review workflow:
 - If operator marks prediction as incorrect:
   - is_correct = False
   - human_label = corrected label
+- Current supported review labels are GOOD and DEFECTIVE
+- If the model predicted GOOD but the product is actually defective:
+  - the operator enters DEFECTIVE and submits Incorrect
+  - the app redirects to the mask drawing page
+- If the model predicted DEFECTIVE but the product is actually good:
+  - the operator enters GOOD and submits Incorrect
+  - no mask is required
 - Special false-negative flow:
   - if model predicted GOOD but human says DEFECTIVE
   - operator is redirected to draw_mask page
@@ -234,10 +252,23 @@ Retraining logic:
 Access control/business rules:
 - /dashboard requires login
 - Only System Administrator can create users
+- Only System Administrator can update roles
+- Only System Administrator can revoke or restore account access
+- Revoked accounts cannot sign in through Google OAuth
+- The app prevents revoking the current admin's own account
+- The app prevents removing the last active System Administrator
 - Only Manufacturing Engineer can start training
 - Only Quality Operator can run inspection
 - Only Quality Operator can view their own inspection history details
 - Review pages/actions require login
+
+Admin dashboard features:
+- Shows active user count, inspection run count, image count, pending review count, and review accuracy
+- Shows role breakdown and revoked account count
+- Shows review queue metrics such as reviewed items, incorrect reviews, corrections awaiting retrain, and legacy unlinked reviews
+- Shows recent inspection activity across operators
+- Allows administrators to change a user's role
+- Allows administrators to revoke or restore account access
 
 Main folders in the repo:
 - app.py
@@ -290,13 +321,14 @@ Current automated testing added to the repo:
 - Test case document:
   - documentation/testing/aqi_test_cases.md
 - Current local result:
-  - 15 tests passed, 0 failed
+  - 23 tests passed, 0 failed
 - Test command:
   - python -m unittest discover -s tests -v
 
 White-box test coverage currently includes:
 - email normalization and validation
 - verified Google email logic
+- revoked Google account login denial
 - model path resolution
 - item-name inference from saved filenames
 - MVTec dataset validation
@@ -306,6 +338,11 @@ Black-box test coverage currently includes:
 - dashboard access requiring login
 - admin user creation
 - non-admin restriction for user creation
+- admin dashboard overview rendering
+- admin role changes
+- user access revoke and restore
+- protection against non-admin revocation
+- protection against self-revocation / removing last active admin
 - inspection request without trained model
 - operator-only history visibility
 - false-negative review redirect to mask drawing

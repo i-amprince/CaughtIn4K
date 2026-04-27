@@ -47,6 +47,115 @@ class BlackBoxTests(AQITestCase):
             created = User.query.filter_by(username="newuser@example.com").first()
             self.assertIsNone(created)
 
+    def test_admin_dashboard_shows_system_overview(self):
+        admin = self.create_user("admin@example.com", "System Administrator")
+        operator = self.create_user("operator@example.com", "Quality Operator")
+        self.create_user("engineer@example.com", "Manufacturing Engineer")
+        self.create_inspection_run(operator.id)
+        self.create_review(predicted_label="GOOD", reviewed=False)
+        self.create_review(
+            predicted_label="DEFECTIVE",
+            reviewed=True,
+            is_correct=True,
+            human_label="DEFECTIVE",
+        )
+        self.login_as(admin)
+
+        response = self.client.get("/dashboard")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Admin System Overview", body)
+        self.assertIn("Recent Inspection Activity", body)
+        self.assertIn("Role Breakdown", body)
+        self.assertIn("Review Queue", body)
+        self.assertIn("Change Role", body)
+        self.assertIn("operator@example.com", body)
+
+    def test_admin_can_update_user_role(self):
+        admin = self.create_user("admin@example.com", "System Administrator")
+        operator = self.create_user("operator@example.com", "Quality Operator")
+        self.login_as(admin)
+
+        response = self.client.post(
+            f"/update_user_role/{operator.id}",
+            data={"role": "Manufacturing Engineer"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            updated = db.session.get(User, operator.id)
+            self.assertEqual(updated.role, "Manufacturing Engineer")
+
+    def test_admin_can_revoke_and_restore_user_access(self):
+        admin = self.create_user("admin@example.com", "System Administrator")
+        operator = self.create_user("operator@example.com", "Quality Operator")
+        self.login_as(admin)
+
+        revoke_response = self.client.post(f"/revoke_user/{operator.id}")
+        self.assertEqual(revoke_response.status_code, 302)
+        with self.app.app_context():
+            revoked = db.session.get(User, operator.id)
+            self.assertTrue(revoked.access_revoked)
+
+        restore_response = self.client.post(f"/restore_user/{operator.id}")
+        self.assertEqual(restore_response.status_code, 302)
+        with self.app.app_context():
+            restored = db.session.get(User, operator.id)
+            self.assertFalse(restored.access_revoked)
+
+    def test_non_admin_cannot_revoke_user_access(self):
+        operator = self.create_user("operator@example.com", "Quality Operator")
+        engineer = self.create_user("engineer@example.com", "Manufacturing Engineer")
+        self.login_as(operator)
+
+        response = self.client.post(f"/revoke_user/{engineer.id}")
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            unchanged = db.session.get(User, engineer.id)
+            self.assertFalse(unchanged.access_revoked)
+
+    def test_admin_cannot_revoke_self(self):
+        admin = self.create_user("admin@example.com", "System Administrator")
+        self.login_as(admin)
+
+        response = self.client.post(f"/revoke_user/{admin.id}")
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            unchanged = db.session.get(User, admin.id)
+            self.assertFalse(unchanged.access_revoked)
+
+    def test_non_admin_cannot_update_user_role(self):
+        operator = self.create_user("operator@example.com", "Quality Operator")
+        engineer = self.create_user("engineer@example.com", "Manufacturing Engineer")
+        self.login_as(operator)
+
+        response = self.client.post(
+            f"/update_user_role/{engineer.id}",
+            data={"role": "System Administrator"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            unchanged = db.session.get(User, engineer.id)
+            self.assertEqual(unchanged.role, "Manufacturing Engineer")
+
+    def test_admin_cannot_demote_last_admin(self):
+        admin = self.create_user("admin@example.com", "System Administrator")
+        self.login_as(admin)
+
+        response = self.client.post(
+            f"/update_user_role/{admin.id}",
+            data={"role": "Quality Operator"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            unchanged = db.session.get(User, admin.id)
+            self.assertEqual(unchanged.role, "System Administrator")
+
     def test_operator_run_inspection_without_model_is_rejected(self):
         operator = self.create_user("operator@example.com", "Quality Operator")
         self.login_as(operator)

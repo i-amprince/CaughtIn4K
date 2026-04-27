@@ -34,6 +34,106 @@
 
         {% if user.role == 'System Administrator' %}
         <div class="card">
+            <div class="section-header">
+                <div>
+                    <h3>Admin System Overview</h3>
+                    <p class="section-copy">
+                        Live operational snapshot across users, inspection runs, and review workload.
+                    </p>
+                </div>
+            </div>
+
+            {% set role_counts = admin_overview.role_counts if admin_overview else {} %}
+            <div class="stats-grid admin-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value">{{ admin_overview.total_users }}</div>
+                    <div class="stat-label">Active Users</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ admin_overview.total_runs }}</div>
+                    <div class="stat-label">Inspection Runs</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ admin_overview.total_images }}</div>
+                    <div class="stat-label">Images Processed</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ admin_overview.pending_reviews }}</div>
+                    <div class="stat-label">Pending Reviews</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">
+                        {% if admin_overview.review_accuracy is not none %}
+                            {{ '%.1f'|format(admin_overview.review_accuracy) }}%
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+                    <div class="stat-label">Review Accuracy</div>
+                </div>
+            </div>
+
+            <div class="admin-split-grid">
+                <div class="admin-panel">
+                    <h4>Role Breakdown</h4>
+                    <div class="metric-list">
+                        <div><span>System Administrators</span><strong>{{ role_counts.get('System Administrator', 0) }}</strong></div>
+                        <div><span>Manufacturing Engineers</span><strong>{{ role_counts.get('Manufacturing Engineer', 0) }}</strong></div>
+                        <div><span>Quality Operators</span><strong>{{ role_counts.get('Quality Operator', 0) }}</strong></div>
+                        <div><span>Revoked accounts</span><strong>{{ admin_overview.revoked_users }}</strong></div>
+                    </div>
+                </div>
+                <div class="admin-panel">
+                    <h4>Review Queue</h4>
+                    <div class="metric-list">
+                        <div><span>Reviewed items</span><strong>{{ admin_overview.reviewed_count }}</strong></div>
+                        <div><span>Correct reviews</span><strong>{{ admin_overview.correct_reviews }}</strong></div>
+                        <div><span>Incorrect reviews</span><strong>{{ admin_overview.incorrect_reviews }}</strong></div>
+                        <div><span>Corrections awaiting retrain</span><strong>{{ admin_overview.pending_retrain }}</strong></div>
+                        <div><span>Legacy unlinked reviews</span><strong>{{ admin_overview.unlinked_reviews }}</strong></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Recent Inspection Activity</h3>
+
+            {% if admin_overview.latest_runs %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Run</th>
+                        <th>Item</th>
+                        <th>Operator</th>
+                        <th>Images</th>
+                        <th>Result Mix</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in admin_overview.latest_runs %}
+                    <tr>
+                        <td>#{{ run.id }}</td>
+                        <td>{{ run.item_name|title }}</td>
+                        <td>{{ run.operator.username if run.operator else 'Unknown' }}</td>
+                        <td>{{ run.total_images }}</td>
+                        <td>
+                            <span class="result-good">{{ run.good_count }} good</span>
+                            <span class="result-separator">/</span>
+                            <span class="result-defective">{{ run.defective_count }} defective</span>
+                        </td>
+                        <td>{{ run.created_at.strftime('%d %b %Y, %I:%M %p') if run.created_at else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="section-copy">No inspection runs have been recorded yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
             <h3>Authorize Google User</h3>
             <p style="color: var(--text-muted); margin-bottom: 20px;">
                 Add the user's Google email and assign a role. They will sign in through Google only, with no local password.
@@ -55,16 +155,16 @@
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Email</th>
                         <th>Role</th>
-                        <th>Sign-In</th>
+                        <th>Status</th>
+                        <th>Change Role</th>
+                        <th>Access</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for u in all_users %}
-                    <tr>
-                        <td>{{ u.id }}</td>
+                    <tr class="{% if u.access_revoked %}is-revoked{% endif %}">
                         <td>{{ u.username }}</td>
                         <td>
                             {% if u.role == 'System Administrator' %}
@@ -75,7 +175,34 @@
                                 <span class="badge badge-op">{{ u.role }}</span>
                             {% endif %}
                         </td>
-                        <td>Google OAuth</td>
+                        <td>
+                            {% if u.access_revoked %}
+                                <span class="badge badge-revoked">Revoked</span>
+                            {% else %}
+                                <span class="badge badge-active">Active</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form action="{{ url_for('admin.update_user_role', user_id=u.id) }}" method="POST" class="role-update-form">
+                                <select name="role" aria-label="Role for {{ u.username }}">
+                                    <option value="Quality Operator" {% if u.role == 'Quality Operator' %}selected{% endif %}>Quality Operator</option>
+                                    <option value="Manufacturing Engineer" {% if u.role == 'Manufacturing Engineer' %}selected{% endif %}>Manufacturing Engineer</option>
+                                    <option value="System Administrator" {% if u.role == 'System Administrator' %}selected{% endif %}>System Administrator</option>
+                                </select>
+                                <button type="submit" class="mini-btn">Update</button>
+                            </form>
+                        </td>
+                        <td>
+                            {% if u.access_revoked %}
+                                <form action="{{ url_for('admin.restore_user', user_id=u.id) }}" method="POST" class="role-update-form">
+                                    <button type="submit" class="mini-btn mini-btn-success">Restore</button>
+                                </form>
+                            {% else %}
+                                <form action="{{ url_for('admin.revoke_user', user_id=u.id) }}" method="POST" class="role-update-form">
+                                    <button type="submit" class="mini-btn mini-btn-danger">Revoke</button>
+                                </form>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

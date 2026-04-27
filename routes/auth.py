@@ -160,6 +160,10 @@ def google_callback():
         flash("This Google account is not authorized yet. Ask an administrator to add your email.", "error")
         return redirect(url_for("auth.login"))
 
+    if user.access_revoked:
+        flash("Access for this account has been revoked. Contact a system administrator.", "error")
+        return redirect(url_for("auth.login"))
+
     login_user(user)
     flash(f"Signed in successfully as {email}.", "success")
     return redirect(url_for("dashboard.dashboard"))
