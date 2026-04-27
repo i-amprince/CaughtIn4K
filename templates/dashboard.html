@@ -212,18 +212,249 @@
 
         {% if user.role == 'Manufacturing Engineer' %}
         <div class="card">
-            <h3>Train New Anomaly Detection Model</h3>
-            <p style="color: var(--text-muted); margin-bottom: 20px;">
-                Provide dataset path and item name.
-            </p>
+            <div class="section-header">
+                <div>
+                    <h3>Model Lifecycle Workspace</h3>
+                    <p class="section-copy">Train, validate, version, and promote anomaly models for inspection.</p>
+                </div>
+            </div>
 
-            <form action="{{ url_for('ml.start_training') }}" method="POST" class="form-inline">
-                <input type="text" name="dataset_path" placeholder="Dataset Path" required style="grid-column: 1 / 3;">
+            <div class="stats-grid admin-stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value">{{ engineer_overview.active_model_count }}</div>
+                    <div class="stat-label">Active Models</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ engineer_overview.completed_job_count }}</div>
+                    <div class="stat-label">Completed Jobs</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ engineer_overview.running_job_count }}</div>
+                    <div class="stat-label">Running Jobs</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ engineer_overview.failed_job_count }}</div>
+                    <div class="stat-label">Failed Jobs</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Train New Anomaly Detection Model</h3>
+            <form action="{{ url_for('ml.start_training') }}" method="POST" class="form-grid folder-form" enctype="multipart/form-data">
                 <input type="text" name="item_name" placeholder="Item Name" required>
+                <label class="folder-picker">
+                    <span class="folder-picker-title">Choose Dataset Folder</span>
+                    <span class="folder-picker-copy" data-folder-label>No folder selected</span>
+                    <input type="file" name="dataset_folder" webkitdirectory directory multiple data-folder-input>
+                </label>
+                <details class="path-fallback">
+                    <summary>Use server path instead</summary>
+                    <input type="text" name="dataset_path" placeholder="Dataset root path, e.g. mvtec_anomaly_detection">
+                </details>
                 <button type="submit" class="add-btn" style="background: var(--engineer-badge);">
                     Start Training
                 </button>
             </form>
+        </div>
+
+        <div class="card">
+            <h3>Dataset Validation</h3>
+            <form action="{{ url_for('ml.validate_dataset') }}" method="POST" class="form-grid folder-form" enctype="multipart/form-data">
+                <input type="text" name="item_name" placeholder="Item Name" required>
+                <label class="folder-picker">
+                    <span class="folder-picker-title">Choose Dataset Folder</span>
+                    <span class="folder-picker-copy" data-folder-label>No folder selected</span>
+                    <input type="file" name="dataset_folder" webkitdirectory directory multiple data-folder-input>
+                </label>
+                <details class="path-fallback">
+                    <summary>Use server path instead</summary>
+                    <input type="text" name="dataset_path" placeholder="Dataset root path">
+                </details>
+                <button type="submit" class="mini-btn">Validate</button>
+            </form>
+
+            {% if dataset_validation %}
+            <div class="validation-panel {{ 'is-valid' if dataset_validation.valid else 'is-invalid' }}">
+                <div class="validation-title">
+                    {{ 'Valid dataset' if dataset_validation.valid else 'Invalid dataset' }}
+                    <span>{{ dataset_validation.item_name|title }}</span>
+                </div>
+                {% if dataset_validation.valid %}
+                <div class="metric-list">
+                    <div><span>Train good images</span><strong>{{ dataset_validation.train_good_images }}</strong></div>
+                    <div><span>Total test images</span><strong>{{ dataset_validation.total_test_images }}</strong></div>
+                    <div><span>Ground-truth masks</span><strong>{{ dataset_validation.total_ground_truth_masks }}</strong></div>
+                    <div><span>Input source</span><strong>{{ dataset_validation.source_mode|title }}</strong></div>
+                </div>
+                <div class="category-list">
+                    {% for category, count in dataset_validation.test_categories.items() %}
+                        <span>{{ category }}: {{ count }}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="section-copy">{{ dataset_validation.message }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Feedback Retraining Queue</h3>
+            {% if engineer_overview.retrain_queue %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Corrections</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in engineer_overview.retrain_queue %}
+                    <tr>
+                        <td>{{ row.item_name|title }}</td>
+                        <td>{{ row.count }} / {{ engineer_overview.retrain_threshold }}</td>
+                        <td>
+                            {% if row.ready %}
+                                <span class="badge badge-active">Ready</span>
+                            {% else %}
+                                <span class="badge badge-eng">{{ row.remaining }} more needed</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form action="{{ url_for('ml.start_feedback_retrain', item_name=row.item_name) }}" method="POST">
+                                <button type="submit" class="mini-btn" {% if not row.ready %}disabled{% endif %}>Retrain</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="section-copy">No reviewed corrections are waiting for retraining.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Model Registry</h3>
+            {% if engineer_overview.model_versions %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Model Path</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for model in engineer_overview.model_versions %}
+                    <tr>
+                        <td>{{ model.item_name|title }}</td>
+                        <td>v{{ model.version_number }}</td>
+                        <td>
+                            {% if model.active %}
+                                <span class="badge badge-active">Active</span>
+                            {% else %}
+                                <span class="badge badge-eng">Stored</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ model.created_at.strftime('%d %b %Y, %I:%M %p') if model.created_at else 'N/A' }}</td>
+                        <td class="path-cell">{{ model.model_path }}</td>
+                        <td>
+                            {% if not model.active %}
+                            <form action="{{ url_for('ml.activate_model', model_id=model.id) }}" method="POST">
+                                <button type="submit" class="mini-btn">Activate</button>
+                            </form>
+                            {% else %}
+                                <span class="section-copy">In use</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="section-copy">No trained model versions have been registered yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Training Job History</h3>
+            {% if engineer_overview.latest_jobs %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Job</th>
+                        <th>Item</th>
+                        <th>Source</th>
+                        <th>Status</th>
+                        <th>Started</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in engineer_overview.latest_jobs %}
+                    <tr>
+                        <td>#{{ job.id }}</td>
+                        <td>{{ job.item_name|title }}</td>
+                        <td>{{ job.source_mode|title }}</td>
+                        <td><span class="badge badge-{{ 'active' if job.status == 'completed' else 'eng' }}">{{ job.status|title }}</span></td>
+                        <td>{{ job.started_at.strftime('%d %b %Y, %I:%M %p') if job.started_at else 'N/A' }}</td>
+                        <td>{{ job.message or 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="section-copy">No training jobs have been started yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Model Evaluation Report</h3>
+            {% if engineer_overview.latest_report %}
+                {% set report = engineer_overview.latest_report %}
+                {% set dataset = report.dataset %}
+                <div class="admin-split-grid">
+                    <div class="admin-panel">
+                        <h4>Latest Completed Model</h4>
+                        <div class="metric-list">
+                            <div><span>Item</span><strong>{{ dataset.item_name|title }}</strong></div>
+                            <div><span>Train good images</span><strong>{{ dataset.train_good_images }}</strong></div>
+                            <div><span>Total test images</span><strong>{{ dataset.total_test_images }}</strong></div>
+                            <div><span>Ground-truth masks</span><strong>{{ dataset.total_ground_truth_masks }}</strong></div>
+                        </div>
+                    </div>
+                    <div class="admin-panel">
+                        <h4>Test Categories</h4>
+                        <div class="category-list">
+                            {% for category, count in dataset.test_categories.items() %}
+                                <span>{{ category }}: {{ count }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="path-cell report-path">{{ report.model_path }}</div>
+            {% else %}
+            <p class="section-copy">A report will appear after the first successful training or feedback retraining job.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Training Logs</h3>
+            {% if engineer_overview.latest_job %}
+                <div class="log-meta">
+                    Job #{{ engineer_overview.latest_job.id }} - {{ engineer_overview.latest_job.item_name|title }} - {{ engineer_overview.latest_job.status|title }}
+                </div>
+                <pre class="log-box">{{ engineer_overview.latest_job.logs or 'No logs recorded yet.' }}</pre>
+            {% else %}
+                <p class="section-copy">Training logs will appear once a job starts.</p>
+            {% endif %}
         </div>
         {% endif %}
 
@@ -245,9 +476,17 @@
                 Enter test dataset path.
             </p>
 
-            <form action="{{ url_for('ml.run_inspection') }}" method="POST">
+            <form action="{{ url_for('ml.run_inspection') }}" method="POST" class="form-grid folder-form" enctype="multipart/form-data">
                 <input type="text" name="item_name" placeholder="Item Name (e.g., bottle)" required>
-                <input type="text" name="test_folder" placeholder="Path to test images" required>
+                <label class="folder-picker">
+                    <span class="folder-picker-title">Choose Test Folder</span>
+                    <span class="folder-picker-copy" data-folder-label>No folder selected</span>
+                    <input type="file" name="test_folder_upload" webkitdirectory directory multiple data-folder-input>
+                </label>
+                <details class="path-fallback">
+                    <summary>Use server path instead</summary>
+                    <input type="text" name="test_folder" placeholder="Path to test images">
+                </details>
                 <button type="submit" class="start-btn">Run AI Model</button>
             </form>
 

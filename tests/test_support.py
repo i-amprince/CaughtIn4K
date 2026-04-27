@@ -7,7 +7,7 @@ from flask import Flask
 from sqlalchemy import inspect as sqlalchemy_inspect
 
 from extensions import db, login_manager
-from models import HumanReview, InspectionImageResult, InspectionRun, User
+from models import HumanReview, InspectionImageResult, InspectionRun, ModelVersion, TrainingJob, User
 from routes import register_blueprints
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -32,6 +32,7 @@ def create_test_app(temp_root: str) -> Flask:
         GOOGLE_OAUTH_BOOTSTRAP_ADMIN_EMAILS=[],
         MODEL_OUTPUT_DIR=str(Path(temp_root) / "model_outputs"),
         LEGACY_MODEL_OUTPUT_DIR=str(Path(temp_root) / "legacy_model_outputs"),
+        USER_UPLOAD_ROOT=str(Path(temp_root) / "uploaded_folders"),
         DATASET_ROOT=str(Path(temp_root) / "dataset_root"),
     )
 
@@ -50,6 +51,7 @@ class AQITestCase(unittest.TestCase):
         Path(self.temp_root).mkdir(parents=True, exist_ok=True)
         Path(self.temp_root, "model_outputs").mkdir(parents=True, exist_ok=True)
         Path(self.temp_root, "legacy_model_outputs").mkdir(parents=True, exist_ok=True)
+        Path(self.temp_root, "uploaded_folders").mkdir(parents=True, exist_ok=True)
         Path(self.temp_root, "dataset_root").mkdir(parents=True, exist_ok=True)
         Path(self.temp_root, "static", "results").mkdir(parents=True, exist_ok=True)
         Path(self.temp_root, "static", "masks").mkdir(parents=True, exist_ok=True)
@@ -143,3 +145,48 @@ class AQITestCase(unittest.TestCase):
             _ = review.id
             db.session.expunge(review)
             return review
+
+    def create_training_job(
+        self,
+        user_id: int | None,
+        item_name: str = "bottle",
+        status: str = "completed",
+        model_path: str = "model.pt",
+    ) -> TrainingJob:
+        with self.app.app_context():
+            job = TrainingJob(
+                item_name=item_name,
+                dataset_path="sample/dataset",
+                source_mode="upload",
+                status=status,
+                requested_by_id=user_id,
+                model_path=model_path,
+                message="Training completed.",
+            )
+            db.session.add(job)
+            db.session.commit()
+            _ = job.id
+            db.session.expunge(job)
+            return job
+
+    def create_model_version(
+        self,
+        item_name: str = "bottle",
+        version_number: int = 1,
+        model_path: str = "model.pt",
+        active: bool = True,
+        training_job_id: int | None = None,
+    ) -> ModelVersion:
+        with self.app.app_context():
+            version = ModelVersion(
+                item_name=item_name,
+                version_number=version_number,
+                model_path=model_path,
+                active=active,
+                training_job_id=training_job_id,
+            )
+            db.session.add(version)
+            db.session.commit()
+            _ = version.id
+            db.session.expunge(version)
+            return version

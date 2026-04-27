@@ -146,6 +146,23 @@ if (dashboardCanvas) {
         if (el) el.remove();
     }
 
+    document.querySelectorAll('[data-folder-input]').forEach(function (input) {
+        input.addEventListener('change', function () {
+            var label = input.closest('.folder-picker').querySelector('[data-folder-label]');
+            if (!label) return;
+
+            if (!input.files || input.files.length === 0) {
+                label.textContent = 'No folder selected';
+                return;
+            }
+
+            var firstFile = input.files[0];
+            var relativePath = firstFile.webkitRelativePath || firstFile.name;
+            var rootName = relativePath.split('/')[0] || 'Selected folder';
+            label.textContent = rootName + ' - ' + input.files.length + ' file(s)';
+        });
+    });
+
     // ── Inspection polling ────────────────────────────────────────────────
     var inspectionTimer = null;
 
@@ -211,6 +228,7 @@ if (dashboardCanvas) {
     var btn = form.querySelector('button[type="submit"]');
     if (btn) {
         btn.disabled = true;
+        btn.dataset.originalText = btn.innerText;
         btn.innerText = "Processing...";
     }
 

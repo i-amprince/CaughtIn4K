@@ -96,6 +96,32 @@ Admins can also change user roles, revoke account access, and restore account ac
 
 ---
 
+## Step 7 - Manufacturing Engineer Model Lifecycle
+
+Manufacturing Engineers manage anomaly model training and model versions through the dashboard.
+
+The UI supports:
+
+* Folder-based dataset selection for model training
+* Dataset structure validation before training
+* Training job history and training logs
+* Model evaluation summaries after successful training
+* Model registry version activation and rollback
+* Feedback retraining queue grouped by product item
+
+Training and validation requests use:
+
+```
+POST /start_training
+POST /validate_dataset
+POST /activate_model/<model_id>
+POST /start_feedback_retrain/<item_name>
+```
+
+The selected folder is uploaded to the server while preserving its directory tree, then the backend uses that saved folder for training or inspection.
+
+---
+
 # 4. Interaction Summary
 
 Through this UI implementation, users can perform the following actions:
@@ -105,6 +131,7 @@ Through this UI implementation, users can perform the following actions:
 * View model predictions and heatmaps
 * Provide feedback to improve the model
 * Review historical inspection results
+* Train, validate, version, activate, and retrain anomaly models
 * Manage user roles and account access as an administrator
 
 The user interface provides a simple and intuitive way for inspectors to interact with the **CaughtIn4K defect detection system** while the backend services handle machine learning inference and data storage.

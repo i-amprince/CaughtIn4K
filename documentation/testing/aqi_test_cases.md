@@ -5,6 +5,7 @@ This project implements an Automated Quality Inspection (AQI) system described i
 - user authentication and role-based access
 - administrator dashboard and account-access management
 - model training for a product/item
+- model lifecycle management for manufacturing engineers
 - batch inspection and anomaly classification
 - review workflow for human-in-the-loop correction
 - mask capture for missed defects
@@ -26,6 +27,7 @@ White-box testing in this project focuses on internal logic, branch conditions, 
 | WB-07 | `training.py` | MVTec dataset validation when a defect image has no ground-truth mask | validation raises `ValueError` |
 | WB-08 | `routes/review.py` | retrain threshold logic when pending corrections are below threshold | retraining is not started |
 | WB-09 | `routes/review.py` | retrain threshold logic when pending corrections reach threshold | items are marked retrained and background launch is triggered |
+| WB-10 | `routes/ml.py` | model-path resolution when an active registered model version exists | active registry version is used for inference |
 
 ## Black-Box Testing
 
@@ -46,6 +48,8 @@ Black-box testing in this project focuses on user-visible behavior without depen
 | BB-11 | History access control | owner opens their run history; another operator opens same run | owner allowed, other operator gets `403` |
 | BB-12 | Review workflow | operator marks `GOOD` prediction as actually `DEFECTIVE` | system redirects to mask drawing page |
 | BB-13 | Mask submission | operator submits a valid defect mask | mask file is saved and review is marked complete |
+| BB-14 | Engineer dashboard | manufacturing engineer opens `/dashboard` | model lifecycle workspace, validation, registry, retraining queue, history, and logs are visible |
+| BB-15 | Dataset validation | engineer submits item name and valid dataset path | validation report is rendered with image/category counts |
 
 ## Executed Automated Tests
 
@@ -62,7 +66,7 @@ python -m unittest discover -s tests -v
 
 Latest local execution result:
 
-- Date: 2026-04-26
-- Total executed tests: 23
-- Status: 23 passed, 0 failed
+- Date: 2026-04-27
+- Total executed tests: 26
+- Status: 26 passed, 0 failed
 - Notes: the run completed successfully in the local development environment using Python `unittest`

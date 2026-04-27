@@ -72,6 +72,37 @@ class HumanReview(db.Model):
     retrained = db.Column(db.Boolean, default=False)
 
 
+class TrainingJob(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    item_name = db.Column(db.String(120), nullable=False)
+    dataset_path = db.Column(db.String(500), nullable=False)
+    source_mode = db.Column(db.String(40), nullable=False, default="upload")
+    status = db.Column(db.String(30), nullable=False, default="queued")
+    started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+    requested_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    model_path = db.Column(db.String(500))
+    message = db.Column(db.Text)
+    logs = db.Column(db.Text, nullable=False, default="")
+    metrics_json = db.Column(db.Text)
+
+    requested_by = db.relationship("User", backref=db.backref("training_jobs", lazy=True))
+
+
+class ModelVersion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    item_name = db.Column(db.String(120), nullable=False)
+    version_number = db.Column(db.Integer, nullable=False)
+    model_path = db.Column(db.String(500), nullable=False)
+    active = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    activated_at = db.Column(db.DateTime)
+    training_job_id = db.Column(db.Integer, db.ForeignKey("training_job.id"), nullable=True)
+    metrics_json = db.Column(db.Text)
+
+    training_job = db.relationship("TrainingJob", backref=db.backref("model_versions", lazy=True))
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))

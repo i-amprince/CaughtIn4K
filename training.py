@@ -8,6 +8,8 @@ from anomalib.engine import Engine
 from anomalib.engine import engine as anomalib_engine
 from anomalib.models import Patchcore
 
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
+
 
 def _patch_anomalib_versioned_dir_for_windows() -> None:
     """Avoid Windows symlink creation for anomalib's latest directory."""
@@ -31,6 +33,16 @@ def _patch_anomalib_versioned_dir_for_windows() -> None:
         return new_version_dir
 
     anomalib_engine.create_versioned_dir = create_versioned_dir_without_symlink
+
+
+def _count_images(folder: Path) -> int:
+    if not folder.is_dir():
+        return 0
+    return sum(
+        1
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+    )
 
 
 def _validate_mvtec_item_structure(mvtec_dataset_path: str, item_name: str) -> Path:
@@ -75,8 +87,47 @@ def _validate_mvtec_item_structure(mvtec_dataset_path: str, item_name: str) -> P
     return item_root
 
 
-def train_local_item_model(mvtec_dataset_path: str, item_name: str, base_output_dir: str) -> str:
-    print(f"Initializing Quality Inspection Training Pipeline for Item: '{item_name}'...")
+def build_mvtec_dataset_report(mvtec_dataset_path: str, item_name: str) -> dict:
+    item_root = _validate_mvtec_item_structure(mvtec_dataset_path, item_name)
+    train_good_dir = item_root / "train" / "good"
+    test_dir = item_root / "test"
+    ground_truth_dir = item_root / "ground_truth"
+
+    test_categories = {}
+    mask_categories = {}
+
+    for category_dir in sorted(path for path in test_dir.iterdir() if path.is_dir()):
+        test_categories[category_dir.name] = _count_images(category_dir)
+
+    if ground_truth_dir.is_dir():
+        for mask_dir in sorted(path for path in ground_truth_dir.iterdir() if path.is_dir()):
+            mask_categories[mask_dir.name] = _count_images(mask_dir)
+
+    return {
+        "dataset_path": str(Path(mvtec_dataset_path)),
+        "item_name": item_name,
+        "train_good_images": _count_images(train_good_dir),
+        "test_categories": test_categories,
+        "ground_truth_categories": mask_categories,
+        "total_test_images": sum(test_categories.values()),
+        "total_ground_truth_masks": sum(mask_categories.values()),
+    }
+
+
+def _emit(message: str, progress_callback=None) -> None:
+    print(message)
+    if progress_callback:
+        progress_callback(message)
+
+
+def train_local_item_model(
+    mvtec_dataset_path: str,
+    item_name: str,
+    base_output_dir: str,
+    progress_callback=None,
+    return_report: bool = False,
+):
+    _emit(f"Initializing Quality Inspection Training Pipeline for Item: '{item_name}'...", progress_callback)
     
     # Validate inputs
     if not mvtec_dataset_path or not item_name or not base_output_dir:
@@ -85,9 +136,15 @@ def train_local_item_model(mvtec_dataset_path: str, item_name: str, base_output_
             f"item_name={item_name}, base_output_dir={base_output_dir}"
         )
     
-    print(f"Using local MVTec dataset located at: {os.path.abspath(mvtec_dataset_path)}")
+    _emit(f"Using local MVTec dataset located at: {os.path.abspath(mvtec_dataset_path)}", progress_callback)
     _patch_anomalib_versioned_dir_for_windows()
-    _validate_mvtec_item_structure(mvtec_dataset_path, item_name)
+    dataset_report = build_mvtec_dataset_report(mvtec_dataset_path, item_name)
+    _emit(
+        "Dataset validated: "
+        f"{dataset_report['train_good_images']} train/good image(s), "
+        f"{dataset_report['total_test_images']} test image(s).",
+        progress_callback,
+    )
     num_workers = 0 if os.name == "nt" else 4
 
     datamodule = MVTec(
@@ -102,7 +159,7 @@ def train_local_item_model(mvtec_dataset_path: str, item_name: str, base_output_
 
     item_output_dir = os.path.join(base_output_dir, item_name)
     os.makedirs(item_output_dir, exist_ok=True)
-    print(f"Model outputs will be saved to: {item_output_dir}")
+    _emit(f"Model outputs will be saved to: {item_output_dir}", progress_callback)
 
     engine = Engine(
         default_root_dir=item_output_dir,
@@ -111,17 +168,26 @@ def train_local_item_model(mvtec_dataset_path: str, item_name: str, base_output_
         devices=1,
     )
 
-    print(f"Starting Model Training on 'Good' products only for '{item_name}'...")
+    _emit(f"Starting Model Training on 'Good' products only for '{item_name}'...", progress_callback)
     engine.fit(datamodule=datamodule, model=model)
 
-    print("Exporting model to Torch (.pt) format for deployment...")
+    _emit("Exporting model to Torch (.pt) format for deployment...", progress_callback)
     engine.export(model=model, export_type=ExportType.TORCH, export_root=item_output_dir)
 
-    print(f"Testing model against defective products for '{item_name}'...")
-    engine.test(datamodule=datamodule, model=model)
+    _emit(f"Testing model against defective products for '{item_name}'...", progress_callback)
+    test_results = engine.test(datamodule=datamodule, model=model)
 
-    print(f"Training Complete! Check: {item_output_dir}")
-    return os.path.join(item_output_dir, "weights", "torch", "model.pt")
+    final_model_path = os.path.join(item_output_dir, "weights", "torch", "model.pt")
+    report = {
+        "dataset": dataset_report,
+        "test_results": test_results or [],
+        "model_path": final_model_path,
+    }
+
+    _emit(f"Training Complete! Check: {item_output_dir}", progress_callback)
+    if return_report:
+        return report
+    return final_model_path
 
 
 if __name__ == "__main__":

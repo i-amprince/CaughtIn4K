@@ -25,3 +25,4 @@ def create_initial_users(app) -> None:
     os.makedirs(os.path.join(app.root_path, "static", "results"), exist_ok=True)
     os.makedirs(app.config["MODEL_OUTPUT_DIR"], exist_ok=True)
     os.makedirs(app.config["LEGACY_MODEL_OUTPUT_DIR"], exist_ok=True)
+    os.makedirs(app.config["USER_UPLOAD_ROOT"], exist_ok=True)

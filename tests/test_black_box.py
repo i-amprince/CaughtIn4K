@@ -72,6 +72,56 @@ class BlackBoxTests(AQITestCase):
         self.assertIn("Change Role", body)
         self.assertIn("operator@example.com", body)
 
+    def test_engineer_dashboard_shows_model_lifecycle_workspace(self):
+        engineer = self.create_user("engineer@example.com", "Manufacturing Engineer")
+        job = self.create_training_job(engineer.id, item_name="bottle")
+        model_path = Path(self.temp_root) / "model_outputs" / "model_registry" / "bottle" / "v1" / "model.pt"
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+        model_path.write_text("model", encoding="utf-8")
+        self.create_model_version(
+            item_name="bottle",
+            version_number=1,
+            model_path=str(model_path),
+            active=True,
+            training_job_id=job.id,
+        )
+        self.login_as(engineer)
+
+        response = self.client.get("/dashboard")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Model Lifecycle Workspace", body)
+        self.assertIn("Dataset Validation", body)
+        self.assertIn("Feedback Retraining Queue", body)
+        self.assertIn("Model Registry", body)
+        self.assertIn("Training Job History", body)
+
+    def test_engineer_can_validate_dataset_from_server_path(self):
+        engineer = self.create_user("engineer@example.com", "Manufacturing Engineer")
+        dataset_root = Path(self.temp_root) / "dataset_to_validate"
+        item_root = dataset_root / "bottle"
+        (item_root / "train" / "good").mkdir(parents=True, exist_ok=True)
+        (item_root / "train" / "good" / "000.png").write_bytes(b"fake")
+        test_dir = item_root / "test" / "contamination"
+        test_dir.mkdir(parents=True, exist_ok=True)
+        (test_dir / "001.png").write_bytes(b"fake")
+        mask_dir = item_root / "ground_truth" / "contamination"
+        mask_dir.mkdir(parents=True, exist_ok=True)
+        (mask_dir / "001_mask.png").write_bytes(b"fake")
+        self.login_as(engineer)
+
+        response = self.client.post(
+            "/validate_dataset",
+            data={"item_name": "bottle", "dataset_path": str(dataset_root)},
+        )
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Valid dataset", body)
+        self.assertIn("Train good images", body)
+        self.assertIn("contamination: 1", body)
+
     def test_admin_can_update_user_role(self):
         admin = self.create_user("admin@example.com", "System Administrator")
         operator = self.create_user("operator@example.com", "Quality Operator")

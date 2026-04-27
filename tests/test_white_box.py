@@ -56,6 +56,27 @@ class WhiteBoxTests(AQITestCase):
 
         self.assertEqual(resolved, str(model_path / "model.pt"))
 
+    def test_resolve_model_path_prefers_active_registry_version(self):
+        deployment_path = Path(self.app.config["MODEL_OUTPUT_DIR"]) / "bottle" / "weights" / "torch"
+        deployment_path.mkdir(parents=True, exist_ok=True)
+        (deployment_path / "model.pt").write_text("deployment", encoding="utf-8")
+
+        registry_path = Path(self.app.config["MODEL_OUTPUT_DIR"]) / "model_registry" / "bottle" / "v2"
+        registry_path.mkdir(parents=True, exist_ok=True)
+        active_model = registry_path / "model.pt"
+        active_model.write_text("active", encoding="utf-8")
+        self.create_model_version(
+            item_name="bottle",
+            version_number=2,
+            model_path=str(active_model),
+            active=True,
+        )
+
+        with self.app.app_context():
+            resolved = ml_routes._resolve_model_path("bottle")
+
+        self.assertEqual(resolved, str(active_model))
+
     def test_infer_item_name_extracts_prefix_from_result_filename(self):
         self.assertEqual(review_routes._infer_item_name("results/bottle_001.png"), "bottle")
         self.assertEqual(review_routes._infer_item_name("results/contamination_sample.png"), "contamination")

@@ -48,6 +48,7 @@ def create_app() -> Flask:
     local_appdata = os.getenv("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
     app.config["MODEL_OUTPUT_DIR"] = os.path.join(local_appdata, "CaughtIn4K", "inspection_model_outputs")
     app.config["LEGACY_MODEL_OUTPUT_DIR"] = os.path.join(app.root_path, "inspection_model_outputs")
+    app.config["USER_UPLOAD_ROOT"] = os.path.join(local_appdata, "CaughtIn4K", "uploaded_folders")
     # Path to your MVTec-style dataset root (needed for incremental retraining).
     # Override via the DATASET_ROOT environment variable or set it directly here.
     app.config["DATASET_ROOT"] = os.getenv("DATASET_ROOT", "")

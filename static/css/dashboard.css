@@ -275,6 +275,13 @@ h3 {
     align-items: end;
 }
 
+.form-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.4fr) minmax(220px, 1fr) auto;
+    gap: 15px;
+    align-items: stretch;
+}
+
 input,
 select {
     padding: 12px 16px;
@@ -306,6 +313,64 @@ select:hover:not(:focus) {
 
 select {
     cursor: pointer;
+}
+
+.folder-picker {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-height: 48px;
+    padding: 10px 14px;
+    background: rgba(10, 10, 10, 0.8);
+    border: 1px dashed rgba(66, 165, 245, 0.42);
+    border-radius: 10px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.folder-picker:hover {
+    border-color: var(--engineer-badge);
+    background: rgba(10, 10, 10, 0.95);
+}
+
+.folder-picker input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.folder-picker-title {
+    color: #bfdbfe;
+    font-weight: 700;
+    font-size: 0.92em;
+}
+
+.folder-picker-copy {
+    color: var(--text-muted);
+    font-size: 0.82em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.path-fallback {
+    min-width: 0;
+    color: var(--text-muted);
+    font-size: 0.88em;
+}
+
+.path-fallback summary {
+    cursor: pointer;
+    padding: 6px 0;
+}
+
+.path-fallback input {
+    width: 100%;
+    margin-top: 8px;
 }
 
 button.add-btn {
@@ -525,6 +590,85 @@ tr.is-revoked td {
     font-weight: 700;
 }
 
+.validation-panel {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 18px;
+}
+
+.validation-panel.is-valid {
+    border-color: rgba(16, 185, 129, 0.28);
+}
+
+.validation-panel.is-invalid {
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
+.validation-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    font-weight: 700;
+}
+
+.validation-title span {
+    color: var(--text-muted);
+}
+
+.category-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.category-list span {
+    border: 1px solid rgba(66, 165, 245, 0.25);
+    color: #bfdbfe;
+    background: rgba(66, 165, 245, 0.08);
+    border-radius: 999px;
+    padding: 7px 10px;
+    font-size: 0.84em;
+    font-weight: 600;
+}
+
+.path-cell {
+    max-width: 340px;
+    color: var(--text-muted);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78em;
+    overflow-wrap: anywhere;
+}
+
+.report-path {
+    margin-top: 16px;
+    max-width: none;
+}
+
+.log-meta {
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    font-size: 0.9em;
+}
+
+.log-box {
+    width: 100%;
+    max-height: 320px;
+    overflow: auto;
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.35);
+    color: #dbeafe;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82em;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
 .result-good {
     color: var(--operator-badge);
     font-weight: 600;
@@ -565,6 +709,14 @@ tr.is-revoked td {
 .mini-btn:hover {
     background: rgba(59, 130, 246, 0.28);
     transform: translateY(-1px);
+}
+
+.mini-btn:disabled,
+.start-btn:disabled,
+.add-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .mini-btn-danger {
@@ -706,6 +858,10 @@ tr.is-revoked td {
 
 @media (max-width: 1024px) {
     .form-inline {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid {
         grid-template-columns: 1fr;
     }
 
